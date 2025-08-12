@@ -2,9 +2,10 @@
 Chat Service for handling conversation logic and command processing.
 This service manages the conversation flow, processes user input, and generates responses.
 """
-
+import sys
 import asyncio
 from services.speech_service import AsyncSpeechService
+from services.llm_service import AsyncLLMService, LLMConfig
 
 class ChatService:
     """
@@ -16,7 +17,8 @@ class ChatService:
         self.speech_service = AsyncSpeechService()
         self.conversation_history = []
         self.is_active = False
-        
+        self.llm_service = AsyncLLMService()
+
     async def initialize(self):
         """Initialize the chat service."""
         print("Chat service initialized")
@@ -67,7 +69,8 @@ class ChatService:
         
         # Simple command processing - you can expand this
         if "hello" in user_text_lower or "hi" in user_text_lower:
-            return "Hello! I'm Saba, your personal assistant. How can I help you today?"
+            # Await the coroutine so we return a string, not a coroutine object
+            return await self.llm_service.acomplete(user_text)
             
         elif "time" in user_text_lower:
             import datetime
@@ -86,8 +89,7 @@ class ChatService:
             return "I can help you with basic commands. Try asking about time, date, or just say hello!"
             
         elif "goodbye" in user_text_lower or "bye" in user_text_lower:
-            return "Goodbye! It was nice talking with you."
-            
+            sys.exit(await self.llm_service.acomplete(user_text))
         else:
             # Default response for unrecognized input
             return f"I heard you say '{user_text}'. I'm still learning how to respond to that. Try asking about time, date, or say hello!"
