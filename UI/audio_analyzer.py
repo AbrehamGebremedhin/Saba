@@ -2,12 +2,16 @@ import time
 import numpy as np
 import soundfile as sf
 import threading
+from config.logger import get_logger
+
+logger = get_logger(__name__)
+
 try:
     import pygame
     PYGAME_AVAILABLE = True
 except ImportError:
     PYGAME_AVAILABLE = False
-    print("Pygame not available, audio playback disabled")
+    logger.warning("Pygame not available, audio playback disabled")
 
 FFT_SIZE = 1024
 
@@ -26,14 +30,14 @@ class AudioAnalyzer:
             try:
                 pygame.mixer.pre_init(frequency=sr, size=-16, channels=1, buffer=1024)
                 pygame.mixer.init()
-                print("Pygame audio initialized")
+                logger.info("Pygame audio initialized")
             except Exception as e:
-                print(f"Failed to initialize pygame audio: {e}")
+                logger.error(f"Failed to initialize pygame audio: {e}")
 
     def play(self, callback=None):
         """Start audio playback using pygame mixer. Calls callback when done if provided."""
         if not PYGAME_AVAILABLE:
-            print("Audio playback disabled - pygame not available")
+            logger.warning("Audio playback disabled - pygame not available")
             self.start_time = time.time()
             if callback:
                 callback()
@@ -42,7 +46,7 @@ class AudioAnalyzer:
             # Load and play the audio file directly
             sound = pygame.mixer.Sound(self.wav_path)
             channel = sound.play()
-            print("Audio playback started with pygame")
+            logger.info("Audio playback started with pygame")
             self.start_time = time.time()
             if callback:
                 def monitor():
@@ -52,7 +56,7 @@ class AudioAnalyzer:
                     callback()
                 threading.Thread(target=monitor, daemon=True).start()
         except Exception as e:
-            print(f"Audio playback failed: {e}")
+            logger.error(f"Audio playback failed: {e}")
             self.start_time = time.time()
             if callback:
                 callback()
@@ -62,9 +66,9 @@ class AudioAnalyzer:
         try:
             if PYGAME_AVAILABLE:
                 pygame.mixer.stop()
-                print("Audio stopped")
+                logger.info("Audio stopped")
         except Exception as e:
-            print(f"Error stopping audio: {e}")
+            logger.error(f"Error stopping audio: {e}")
         finally:
             self.start_time = None
 

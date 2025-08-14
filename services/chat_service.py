@@ -7,6 +7,9 @@ import asyncio
 from services.speech_service import AsyncSpeechService
 from services.llm_service import AsyncLLMService, LLMConfig
 from tools.agents import AsyncAgentExecutor
+from config.logger import get_logger
+
+logger = get_logger(__name__)
 
 class ChatService:
     """
@@ -26,7 +29,7 @@ class ChatService:
 
     async def initialize(self):
         """Initialize the chat service."""
-        print("Chat service initialized")
+        logger.info("Chat service initialized")
         
     async def get_welcome_message(self) -> str:
         """Get the welcome message for when the application starts."""
@@ -45,7 +48,7 @@ class ChatService:
         if not user_text:
             return None
             
-        print(f"Processing user input: {user_text}")
+        logger.info(f"Processing user input: {user_text}")
         
         # Add user input to conversation history
         self.conversation_history.append({"role": "user", "content": user_text})
@@ -138,9 +141,9 @@ class ChatService:
             
         try:
             await self.speech_service.synthesize(response_text, output_prefix="response")
-            print(f"Response synthesized: {response_text}")
+            logger.info(f"Response synthesized: {response_text}")
         except Exception as e:
-            print(f"Error synthesizing response: {e}")
+            logger.error(f"Error synthesizing response: {e}")
             
     def get_conversation_history(self) -> list:
         """Get the conversation history."""
@@ -149,14 +152,14 @@ class ChatService:
     def clear_conversation_history(self):
         """Clear the conversation history."""
         self.conversation_history.clear()
-        print("Conversation history cleared")
+        logger.info("Conversation history cleared")
         
     def start_conversation(self):
         """Mark the conversation as active."""
         self.is_active = True
-        print("Conversation started")
+        logger.info("Conversation started")
         
     def stop_conversation(self):
         """Mark the conversation as inactive."""
         self.is_active = False
-        print("Conversation stopped")
+        logger.info("Conversation stopped")

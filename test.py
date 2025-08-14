@@ -3,13 +3,16 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import sounddevice as sd
 import numpy as np
 import queue
+from config.logger import get_logger
+
+logger = get_logger(__name__)
 
 # ===== Model & Device Config =====
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 model_id = "openai/whisper-large-v3"
-print(f"Device set to use {device}")
+logger.info(f"Device set to use {device}")
 
 model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
@@ -39,14 +42,14 @@ q = queue.Queue()
 
 def audio_callback(indata, frames, time_, status):
     if status:
-        print(status)
+        logger.warning(f"Audio callback status: {status}")
     q.put(indata.copy())
 
 def is_speech(audio, threshold=silence_threshold):
     return np.mean(np.abs(audio)) > threshold
 
 # ===== Main Listening Loop =====
-print("Listening... Press Ctrl+C to stop.")
+logger.info("Listening... Press Ctrl+C to stop.")
 try:
     with sd.InputStream(
         samplerate=samplerate,
@@ -77,15 +80,15 @@ try:
 
                     duration = len(chunk) / samplerate
                     if duration >= MIN_SPEECH_DURATION:
-                        print("Processing speech...")
+                        logger.info("Processing speech...")
                         result = pipe(
                             chunk,
                             return_timestamps=True,
                             generate_kwargs={"language": "en"}  # Force English
                         )
-                        print("Transcription:", result.get("text"))
+                        logger.info(f"Transcription: {result.get('text')}")
                     else:
-                        print("[Too short, skipping transcription]")
+                        logger.debug("[Too short, skipping transcription]")
 
 except KeyboardInterrupt:
-    print("Stopped listening.")
+    logger.info("Stopped listening.")

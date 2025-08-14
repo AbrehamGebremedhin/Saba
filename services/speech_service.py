@@ -7,6 +7,9 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import sounddevice as sd
 import numpy as np
 import queue
+from config.logger import get_logger
+
+logger = get_logger(__name__)
 
 class AsyncSpeechService:
     def __init__(self, lang_code='a', voice='bf_alice'):
@@ -18,7 +21,7 @@ class AsyncSpeechService:
         self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         
         model_id = "openai/whisper-large-v3"
-        print(f"Device set to use {self.device}")
+        logger.info(f"Device set to use {self.device}")
         
         self.model = AutoModelForSpeechSeq2Seq.from_pretrained(
             model_id, torch_dtype=self.torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
@@ -48,7 +51,7 @@ class AsyncSpeechService:
         generator = self.pipeline(text, voice=self.voice)
         tasks = []
         for i, (gs, ps, audio) in enumerate(generator):
-            print(i, gs, ps)
+            logger.debug(f"Synthesis iteration {i}: gs={gs}, ps={ps}")
             # Write audio asynchronously
             task = loop.run_in_executor(None, sf.write, f'output.wav', audio, 24000)
             tasks.append(task)
@@ -56,7 +59,7 @@ class AsyncSpeechService:
 
     def audio_callback(self, indata, frames, time_, status):
         if status:
-            print(status)
+            logger.warning(f"Audio callback status: {status}")
         self.q.put(indata.copy())
 
     def is_speech(self, audio, threshold=None):
@@ -71,7 +74,7 @@ class AsyncSpeechService:
         """
         self.q = queue.Queue()
         
-        print("Listening... Press Ctrl+C to stop.")
+        logger.info("Listening... Press Ctrl+C to stop.")
         try:
             with sd.InputStream(
                 samplerate=self.samplerate,
@@ -102,22 +105,22 @@ class AsyncSpeechService:
 
                             duration = len(chunk) / self.samplerate
                             if duration >= self.MIN_SPEECH_DURATION:
-                                print("Processing speech...")
+                                logger.info("Processing speech...")
                                 result = self.pipe(
                                     chunk,
                                     return_timestamps=True,
                                     generate_kwargs={"language": "en"}
                                 )
                                 text = result.get("text")
-                                print("Transcription:", text)
+                                logger.info(f"Transcription: {text}")
                                 return text
                             else:
-                                print("[Too short, skipping transcription]")
+                                logger.debug("[Too short, skipping transcription]")
 
         except KeyboardInterrupt:
-            print("Stopped listening.")
+            logger.info("Stopped listening.")
             return None
         except Exception as e:
-            print(f"Error during speech recognition: {e}")
+            logger.error(f"Error during speech recognition: {e}")
             return None
         
