@@ -1,7 +1,9 @@
+
 import time
 import math
 import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QOpenGLWidget
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -12,6 +14,8 @@ from .audio_analyzer import AudioAnalyzer
 FPS_TARGET = 60
 
 class SabaGL(QOpenGLWidget):
+    audio_finished = pyqtSignal()
+
     def __init__(self, wav_path):
         super().__init__()
         self.setMinimumSize(900, 700)
@@ -52,6 +56,8 @@ class SabaGL(QOpenGLWidget):
         self.outer_hud_alpha = 0.22
         self.outer_hud_tick_alpha = 0.28
         self.outer_hud_sweep_speed = 0.6
+        # Track audio playing state
+        self._audio_playing = False
 
     def initializeGL(self):
         glClearColor(0.0, 0.02, 0.05, 1.0)
@@ -144,13 +150,32 @@ class SabaGL(QOpenGLWidget):
             print(f"Error loading audio file {wav_path}: {e}")
 
     def play_audio(self):
-        """Manually trigger audio playback."""
+        """Manually trigger audio playback and emit audio_finished when done."""
         try:
             if self.audio:
-                QtCore.QTimer.singleShot(300, self.audio.play)
+                self._audio_playing = True
+                def on_audio_done():
+                    self._audio_playing = False
+                    self.audio_finished.emit()
+                QtCore.QTimer.singleShot(300, lambda: self._play_and_emit(on_audio_done))
                 print("Audio playback triggered")
         except Exception as e:
             print(f"Error triggering audio playback: {e}")
+
+    def _play_and_emit(self, on_done):
+        """Play audio and call on_done when finished."""
+        try:
+            if self.audio:
+                self.audio.play(callback=on_done)
+            else:
+                on_done()
+        except Exception as e:
+            print(f"Error in _play_and_emit: {e}")
+            on_done()
+
+    def is_audio_playing(self):
+        """Return True if audio is currently playing."""
+        return self._audio_playing
 
     def update_scene(self):
         rms, spec = self.audio.analyze()

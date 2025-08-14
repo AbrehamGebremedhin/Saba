@@ -45,24 +45,29 @@ class SabaUIManager:
         """Initialize the UI manager with all necessary components."""
         # Initialize chat service
         self.chat_service = ChatService()
-        asyncio.run(self.chat_service.initialize())
-        
+        # Use run_until_complete to initialize async chat service safely
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If already running (e.g., in Jupyter or PyQt), schedule as a task
+            asyncio.create_task(self.chat_service.initialize())
+        else:
+            loop.run_until_complete(self.chat_service.initialize())
+
         # Create QApplication if it doesn't exist
         if not QtWidgets.QApplication.instance():
             self.app = QtWidgets.QApplication(sys.argv)
-            
             # Set application properties
             self.app.setApplicationName("Saba")
             self.app.setApplicationVersion("1.0")
             self.app.setOrganizationName("Saba Project")
         else:
             self.app = QtWidgets.QApplication.instance()
-        
+
         # Check if output.wav exists, create dummy if not
         wav_path = 'output.wav'
         if not os.path.exists(wav_path):
             self._create_dummy_audio(wav_path)
-        
+
         # Create and setup the main window
         self.window = SabaWindow(wav_path)
         
@@ -114,14 +119,28 @@ class SabaUIManager:
             print("UI not initialized - call initialize() first")
     
     def _start_speech_interaction(self):
-        """Start the speech interaction loop."""
-        # Start listening for speech immediately
-        self._listen_for_speech()
+        """Start the speech interaction loop after audio playback is finished."""
+        if self.window and self.window.gl:
+            # Connect to the audio finished signal, so we only listen after playback
+            try:
+                self.window.gl.audio_finished.disconnect(self._listen_for_speech)
+            except Exception:
+                pass  # Ignore if not connected
+            self.window.gl.audio_finished.connect(self._listen_for_speech)
+            # If audio is not playing, start listening immediately
+            if not getattr(self.window.gl, 'is_audio_playing', lambda: False)():
+                self._listen_for_speech()
+        else:
+            self._listen_for_speech()
         
     def _start_with_welcome(self):
         """Start with a welcome message, then begin speech interaction."""
         # Synthesize and play welcome message
-        asyncio.run(self._play_welcome_message())
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(self._play_welcome_message())
+        else:
+            loop.run_until_complete(self._play_welcome_message())
         
     async def _play_welcome_message(self):
         """Synthesize and play the welcome message."""
@@ -139,8 +158,8 @@ class SabaUIManager:
                 self.window.gl.load_audio('output.wav')
                 self.window.gl.play_audio()
             
-            # Wait a bit for the welcome message to finish, then start listening
-            QTimer.singleShot(4000, self._start_speech_interaction)
+            # Start speech interaction only after audio finishes
+            self._start_speech_interaction()
                 
         except Exception as e:
             print(f"Error during welcome message: {e}")
@@ -161,9 +180,12 @@ class SabaUIManager:
     def _on_speech_recognized(self, text):
         """Handle recognized speech."""
         print(f"You said: {text}")
-        
         # Process with chat service and synthesize response asynchronously
-        asyncio.run(self._process_and_respond(text))
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(self._process_and_respond(text))
+        else:
+            loop.run_until_complete(self._process_and_respond(text))
     
     async def _process_and_respond(self, user_text):
         """Process user input through chat service and respond."""
@@ -181,8 +203,8 @@ class SabaUIManager:
                     self.window.gl.load_audio('output.wav')
                     self.window.gl.play_audio()
             
-            # Wait a bit before listening again
-            QTimer.singleShot(3000, self._listen_for_speech)
+            # Start speech interaction only after audio finishes
+            self._start_speech_interaction()
                 
         except Exception as e:
             print(f"Error during processing: {e}")

@@ -30,24 +30,32 @@ class AudioAnalyzer:
             except Exception as e:
                 print(f"Failed to initialize pygame audio: {e}")
 
-    def play(self):
-        """Start audio playback using pygame mixer."""
+    def play(self, callback=None):
+        """Start audio playback using pygame mixer. Calls callback when done if provided."""
         if not PYGAME_AVAILABLE:
             print("Audio playback disabled - pygame not available")
             self.start_time = time.time()
+            if callback:
+                callback()
             return
-            
         try:
             # Load and play the audio file directly
             sound = pygame.mixer.Sound(self.wav_path)
-            sound.play()
+            channel = sound.play()
             print("Audio playback started with pygame")
-            
+            self.start_time = time.time()
+            if callback:
+                def monitor():
+                    # Wait until playback is finished
+                    while channel.get_busy():
+                        time.sleep(0.05)
+                    callback()
+                threading.Thread(target=monitor, daemon=True).start()
         except Exception as e:
             print(f"Audio playback failed: {e}")
-        
-        # Always set start_time regardless of playback success
-        self.start_time = time.time()
+            self.start_time = time.time()
+            if callback:
+                callback()
     
     def stop(self):
         """Stop audio playback safely."""

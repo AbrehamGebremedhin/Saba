@@ -6,6 +6,7 @@ import sys
 import asyncio
 from services.speech_service import AsyncSpeechService
 from services.llm_service import AsyncLLMService, LLMConfig
+from tools.agents import AsyncAgentExecutor
 
 class ChatService:
     """
@@ -18,6 +19,10 @@ class ChatService:
         self.conversation_history = []
         self.is_active = False
         self.llm_service = AsyncLLMService()
+        self.agent_executor = AsyncAgentExecutor(
+            llm=self.llm_service._llm,
+            verbose=False
+        )
 
     async def initialize(self):
         """Initialize the chat service."""
@@ -77,23 +82,12 @@ class ChatService:
             current_time = datetime.datetime.now().strftime("%I:%M %p")
             return f"The current time is {current_time}"
             
-        elif "date" in user_text_lower:
-            import datetime
-            current_date = datetime.datetime.now().strftime("%B %d, %Y")
-            return f"Today is {current_date}"
-            
-        elif "weather" in user_text_lower:
-            return "I don't have access to weather data yet, but it's a great day to chat!"
-            
-        elif "help" in user_text_lower:
-            return "I can help you with basic commands. Try asking about time, date, or just say hello!"
-            
         elif "goodbye" in user_text_lower or "bye" in user_text_lower:
             sys.exit(await self.llm_service.acomplete(user_text))
         else:
             # Default response for unrecognized input
-            return f"I heard you say '{user_text}'. I'm still learning how to respond to that. Try asking about time, date, or say hello!"
-            
+            return await self.agent_executor.ainvoke(user_text)
+
     async def synthesize_response(self, response_text: str, output_file: str = "output.wav"):
         """
         Synthesize the response text to speech.

@@ -29,8 +29,15 @@ class AsyncSpeechService:
         try:
             with sr.Microphone() as source:
                 print("Listening...")
-                # Add timeout to prevent hanging
-                audio = recognizer.listen(source, timeout=5, phrase_time_limit=5)
+                recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                # recognizer.dynamic_energy_threshold = True
+                recognizer.energy_threshold = 400
+                audio = recognizer.listen(source)
+                try:
+                    print("Recognizing...")
+                    return recognizer.recognize_google(audio)
+                except sr.UnknownValueError:
+                    return None
         except sr.WaitTimeoutError:
             print("Listening timed out - no speech detected.")
             return None
