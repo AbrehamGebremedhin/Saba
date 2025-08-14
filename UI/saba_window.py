@@ -3,6 +3,8 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPropertyAnimation, QEasingCurv
 from PyQt5.QtWidgets import QLabel, QTextEdit, QProgressBar, QHBoxLayout, QVBoxLayout, QPushButton, QGraphicsOpacityEffect
 
 from .saba_gl import SabaGL
+from .color_scheme import color_scheme
+from .typography import typography
 
 class ModernSubtitleWidget(QtWidgets.QWidget):
     """Modern subtitle-style overlay for speech transcription"""
@@ -25,23 +27,29 @@ class ModernSubtitleWidget(QtWidgets.QWidget):
         
     def setup_ui(self):
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.setStyleSheet("""
-            QWidget {
+        
+        # Get dynamic colors from color scheme
+        bg_color = color_scheme.palette.bg_transparent_blue
+        text_color = color_scheme.palette.text_primary
+        border_color = color_scheme.get_color('accent', 0.3)
+        
+        self.setStyleSheet(f"""
+            QWidget {{
                 background: transparent;
-            }
-            QLabel {
+            }}
+            QLabel {{
                 background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
-                    stop: 0 rgba(0, 15, 25, 0.85),
-                    stop: 0.5 rgba(0, 20, 35, 0.9),
-                    stop: 1 rgba(0, 15, 25, 0.85));
-                color: rgba(200, 240, 255, 0.95);
-                font-family: 'Segoe UI', 'Arial', sans-serif;
+                    stop: 0 rgba({int(bg_color[0]*255)}, {int(bg_color[1]*255)}, {int(bg_color[2]*255)}, {bg_color[3]}),
+                    stop: 0.5 rgba({int(bg_color[0]*255*1.2)}, {int(bg_color[1]*255*1.2)}, {int(bg_color[2]*255*1.2)}, {bg_color[3]*1.1}),
+                    stop: 1 rgba({int(bg_color[0]*255)}, {int(bg_color[1]*255)}, {int(bg_color[2]*255)}, {bg_color[3]}));
+                color: rgba({int(text_color[0]*255)}, {int(text_color[1]*255)}, {int(text_color[2]*255)}, 0.95);
+                font-family: '{typography.loaded_fonts.get("secondary", "Arial")}', 'Arial', sans-serif;
                 font-size: 18px;
                 font-weight: 300;
                 padding: 16px 32px;
                 border-radius: 12px;
-                border: 1px solid rgba(100, 200, 255, 0.3);
-            }
+                border: 1px solid rgba({int(border_color[0]*255)}, {int(border_color[1]*255)}, {int(border_color[2]*255)}, {border_color[3]});
+            }}
         """)
         
         layout = QHBoxLayout(self)
@@ -50,43 +58,54 @@ class ModernSubtitleWidget(QtWidgets.QWidget):
         self.subtitle_label = QLabel()
         self.subtitle_label.setAlignment(Qt.AlignCenter)
         self.subtitle_label.setWordWrap(True)
+        self.subtitle_label.setFont(typography.get_body_font(18))
         layout.addWidget(self.subtitle_label)
         
         # Initially hidden
         self.setVisible(False)
         
     def show_subtitle(self, text, speaker="", duration=4000):
-        """Show subtitle with fade in/out animation - JARVIS style"""
+        """Show subtitle with fade in/out animation - Enhanced JARVIS style"""
         if speaker and speaker.upper() != "SYSTEM":
             if speaker.upper() == "USER":
                 display_text = text
-                self.subtitle_label.setStyleSheet("""
+                # Dynamic user styling
+                user_bg = color_scheme.palette.bg_transparent_dark
+                user_text = color_scheme.palette.info_bright
+                user_border = color_scheme.get_color('info_base', 0.4)
+                
+                self.subtitle_label.setStyleSheet(f"""
                     background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
-                        stop: 0 rgba(0, 25, 50, 0.85),
-                        stop: 0.5 rgba(0, 35, 60, 0.9),
-                        stop: 1 rgba(0, 25, 50, 0.85));
-                    color: rgba(180, 220, 255, 0.95);
-                    font-family: 'Segoe UI', 'Arial', sans-serif;
+                        stop: 0 rgba({int(user_bg[0]*255)}, {int(user_bg[1]*255)}, {int(user_bg[2]*255)}, {user_bg[3]}),
+                        stop: 0.5 rgba({int(user_bg[0]*255*1.3)}, {int(user_bg[1]*255*1.3)}, {int(user_bg[2]*255*1.3)}, {user_bg[3]*1.1}),
+                        stop: 1 rgba({int(user_bg[0]*255)}, {int(user_bg[1]*255)}, {int(user_bg[2]*255)}, {user_bg[3]}));
+                    color: rgba({int(user_text[0]*255)}, {int(user_text[1]*255)}, {int(user_text[2]*255)}, 0.95);
+                    font-family: '{typography.loaded_fonts.get("secondary", "Arial")}', 'Arial', sans-serif;
                     font-size: 18px;
                     font-weight: 300;
                     padding: 16px 32px;
                     border-radius: 12px;
-                    border: 1px solid rgba(100, 180, 255, 0.4);
+                    border: 1px solid rgba({int(user_border[0]*255)}, {int(user_border[1]*255)}, {int(user_border[2]*255)}, {user_border[3]});
                 """)
             else:  # SABA
                 display_text = text
-                self.subtitle_label.setStyleSheet("""
+                # Dynamic SABA styling
+                saba_bg = color_scheme.palette.bg_transparent_blue
+                saba_text = color_scheme.palette.energy_bright
+                saba_border = color_scheme.get_color('primary', 0.4)
+                
+                self.subtitle_label.setStyleSheet(f"""
                     background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
-                        stop: 0 rgba(0, 15, 25, 0.85),
-                        stop: 0.5 rgba(0, 20, 35, 0.9),
-                        stop: 1 rgba(0, 15, 25, 0.85));
-                    color: rgba(200, 240, 255, 0.95);
-                    font-family: 'Segoe UI', 'Arial', sans-serif;
+                        stop: 0 rgba({int(saba_bg[0]*255)}, {int(saba_bg[1]*255)}, {int(saba_bg[2]*255)}, {saba_bg[3]}),
+                        stop: 0.5 rgba({int(saba_bg[0]*255*1.2)}, {int(saba_bg[1]*255*1.2)}, {int(saba_bg[2]*255*1.2)}, {saba_bg[3]*1.1}),
+                        stop: 1 rgba({int(saba_bg[0]*255)}, {int(saba_bg[1]*255)}, {int(saba_bg[2]*255)}, {saba_bg[3]}));
+                    color: rgba({int(saba_text[0]*255)}, {int(saba_text[1]*255)}, {int(saba_text[2]*255)}, 0.95);
+                    font-family: '{typography.loaded_fonts.get("primary", "Arial")}', 'Arial', sans-serif;
                     font-size: 18px;
-                    font-weight: 300;
+                    font-weight: 400;
                     padding: 16px 32px;
                     border-radius: 12px;
-                    border: 1px solid rgba(120, 200, 255, 0.4);
+                    border: 1px solid rgba({int(saba_border[0]*255)}, {int(saba_border[1]*255)}, {int(saba_border[2]*255)}, {saba_border[3]});
                 """)
         else:
             display_text = text
@@ -141,28 +160,33 @@ class ModernStatusWidget(QtWidgets.QWidget):
         
     def setup_ui(self):
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.setFixedHeight(60)  # Increased height to prevent overlap
+        self.setFixedHeight(60)
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(25, 15, 25, 15)
         layout.setSpacing(20)
         
-        # Status indicator (subtle animated dot)
+        # Status indicator (enhanced animated dot)
         self.status_indicator = QtWidgets.QLabel("●")
-        self.status_indicator.setStyleSheet("""
-            color: rgba(100, 200, 255, 0.6);
+        indicator_color = color_scheme.get_color('accent', 0.6)
+        self.status_indicator.setStyleSheet(f"""
+            color: rgba({int(indicator_color[0]*255)}, {int(indicator_color[1]*255)}, {int(indicator_color[2]*255)}, {indicator_color[3]});
             font-size: 14px;
             font-weight: bold;
         """)
         layout.addWidget(self.status_indicator)
         
-        # Status text - more JARVIS-like
+        # Status text - Enhanced JARVIS-like with dynamic colors
         self.status_label = QLabel("STANDBY")
-        self.status_label.setStyleSheet("""
-            color: rgba(200, 240, 255, 0.7);
-            font-family: 'Segoe UI', 'Arial', sans-serif;
+        self.status_label.setFont(typography.get_status_font(10))
+        
+        # Futuristic cyan color for status text
+        status_color = (0.0, 0.8, 1.0, 0.8)  # Bright cyan
+        self.status_label.setStyleSheet(f"""
+            color: rgba({int(status_color[0]*255)}, {int(status_color[1]*255)}, {int(status_color[2]*255)}, {status_color[3]});
+            font-family: '{typography.loaded_fonts.get("secondary", "Arial")}', 'Arial', sans-serif;
             font-size: 11px;
-            font-weight: 400;
+            font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 2px;
         """)
@@ -170,13 +194,15 @@ class ModernStatusWidget(QtWidgets.QWidget):
         
         layout.addStretch()
         
-        # System time - more subtle
+        # System time - Futuristic pale green styling
         self.time_label = QLabel()
-        self.time_label.setStyleSheet("""
-            color: rgba(150, 200, 255, 0.4);
-            font-family: 'Consolas', 'Monaco', monospace;
+        self.time_label.setFont(typography.get_mono_font(10))
+        time_color = (0.4, 1.0, 0.6, 0.7)  # Pale yellow-green
+        self.time_label.setStyleSheet(f"""
+            color: rgba({int(time_color[0]*255)}, {int(time_color[1]*255)}, {int(time_color[2]*255)}, {time_color[3]});
+            font-family: '{typography.loaded_fonts.get("monospace", "Consolas")}', 'Consolas', monospace;
             font-size: 10px;
-            font-weight: 300;
+            font-weight: 400;
         """)
         layout.addWidget(self.time_label)
         
@@ -192,18 +218,29 @@ class ModernStatusWidget(QtWidgets.QWidget):
         self.time_label.setText(current_time)
         
     def set_status(self, status, is_processing=False):
-        """Update status with subtle visual feedback - JARVIS style"""
+        """Update status with JARVIS-style bright cyan for LISTENING."""
         self.current_status = status
         self.status_label.setText(status.upper())
         
         if status.lower() == "listening":
             self.is_listening = True
-            self.status_indicator.setStyleSheet("""
-                color: rgba(100, 255, 200, 0.8);
+            # Bright cyan color for LISTENING - JARVIS style
+            listening_color = (0.0, 0.8, 1.0, 0.95)  # Bright cyan
+            self.status_indicator.setStyleSheet(f"""
+                color: rgba({int(listening_color[0]*255)}, {int(listening_color[1]*255)}, {int(listening_color[2]*255)}, {listening_color[3]});
                 font-size: 14px;
                 font-weight: bold;
             """)
-            # Start subtle breathing animation
+            # Update status label with bright cyan
+            self.status_label.setStyleSheet(f"""
+                color: rgba({int(listening_color[0]*255)}, {int(listening_color[1]*255)}, {int(listening_color[2]*255)}, {listening_color[3]});
+                font-family: '{typography.loaded_fonts.get("secondary", "Arial")}', 'Arial', sans-serif;
+                font-size: 11px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+            """)
+            # Start breathing animation
             self.breathing_animation.setStartValue(0.6)
             self.breathing_animation.setEndValue(1.0)
             self.breathing_animation.start()
@@ -211,8 +248,10 @@ class ModernStatusWidget(QtWidgets.QWidget):
         elif status.lower() == "processing" or is_processing:
             self.is_listening = False
             self.breathing_animation.stop()
-            self.status_indicator.setStyleSheet("""
-                color: rgba(255, 220, 100, 0.8);
+            # Warm gold for processing
+            processing_color = (1.0, 0.7, 0.2, 0.8)
+            self.status_indicator.setStyleSheet(f"""
+                color: rgba({int(processing_color[0]*255)}, {int(processing_color[1]*255)}, {int(processing_color[2]*255)}, {processing_color[3]});
                 font-size: 14px;
                 font-weight: bold;
             """)
@@ -220,8 +259,10 @@ class ModernStatusWidget(QtWidgets.QWidget):
         elif status.lower() == "playing audio":
             self.is_listening = False
             self.breathing_animation.stop()
-            self.status_indicator.setStyleSheet("""
-                color: rgba(100, 200, 255, 0.9);
+            # Green for active audio
+            audio_color = (0.2, 1.0, 0.4, 0.9)
+            self.status_indicator.setStyleSheet(f"""
+                color: rgba({int(audio_color[0]*255)}, {int(audio_color[1]*255)}, {int(audio_color[2]*255)}, {audio_color[3]});
                 font-size: 14px;
                 font-weight: bold;
             """)
@@ -229,8 +270,10 @@ class ModernStatusWidget(QtWidgets.QWidget):
         else:  # Standby
             self.is_listening = False
             self.breathing_animation.stop()
-            self.status_indicator.setStyleSheet("""
-                color: rgba(100, 200, 255, 0.6);
+            # Dim gray for standby
+            standby_color = (0.5, 0.5, 0.6, 0.6)
+            self.status_indicator.setStyleSheet(f"""
+                color: rgba({int(standby_color[0]*255)}, {int(standby_color[1]*255)}, {int(standby_color[2]*255)}, {standby_color[3]});
                 font-size: 14px;
                 font-weight: bold;
             """)
@@ -246,44 +289,56 @@ class ModernControlWidget(QtWidgets.QWidget):
         
     def setup_ui(self):
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
-        self.setStyleSheet("""
-            QWidget {
+        
+        # Enhanced JARVIS-style bold red colors for EXIT button
+        bg_color = (0.9, 0.15, 0.15)  # Slightly brighter red base
+        bg_hover = (1.0, 0.3, 0.3)   # Brighter red on hover
+        bg_pressed = (0.7, 0.1, 0.1)  # Darker red when pressed
+        border_color = (1.0, 0.4, 0.4, 0.8)  # Brighter red border
+        border_hover = (1.0, 0.5, 0.5, 1.0)  # Even brighter border on hover
+        text_color = (1.0, 1.0, 1.0)  # White text
+        
+        self.setStyleSheet(f"""
+            QWidget {{
                 background: transparent;
-            }
-            QPushButton {
+            }}
+            QPushButton {{
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 rgba(255, 100, 100, 0.25),
-                    stop: 1 rgba(200, 50, 50, 0.35));
-                border: 1px solid rgba(255, 100, 100, 0.4);
+                    stop: 0 rgba({int(bg_color[0]*255)}, {int(bg_color[1]*255)}, {int(bg_color[2]*255)}, 0.85),
+                    stop: 1 rgba({int(bg_color[0]*255*0.8)}, {int(bg_color[1]*255*0.8)}, {int(bg_color[2]*255*0.8)}, 0.9));
+                border: 2px solid rgba({int(border_color[0]*255)}, {int(border_color[1]*255)}, {int(border_color[2]*255)}, {border_color[3]});
                 border-radius: 18px;
-                color: rgba(255, 255, 255, 0.9);
-                font-family: 'Segoe UI', 'Arial', sans-serif;
+                color: rgba({int(text_color[0]*255)}, {int(text_color[1]*255)}, {int(text_color[2]*255)}, 0.95);
+                font-family: '{typography.loaded_fonts.get("secondary", "Arial")}', 'Arial', sans-serif;
                 font-size: 11px;
-                font-weight: 600;
+                font-weight: 700;
                 padding: 8px 16px;
                 min-width: 50px;
                 text-transform: uppercase;
-                letter-spacing: 0.8px;
-            }
-            QPushButton:hover {
+                letter-spacing: 1.2px;
+            }}
+            QPushButton:hover {{
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 rgba(255, 120, 120, 0.4),
-                    stop: 1 rgba(220, 80, 80, 0.5));
-                border: 1px solid rgba(255, 150, 150, 0.6);
-                color: rgba(255, 255, 255, 1.0);
-            }
-            QPushButton:pressed {
+                    stop: 0 rgba({int(bg_hover[0]*255)}, {int(bg_hover[1]*255)}, {int(bg_hover[2]*255)}, 0.9),
+                    stop: 1 rgba({int(bg_hover[0]*255*0.8)}, {int(bg_hover[1]*255*0.8)}, {int(bg_hover[2]*255*0.8)}, 0.95));
+                border: 2px solid rgba({int(border_hover[0]*255)}, {int(border_hover[1]*255)}, {int(border_hover[2]*255)}, {border_hover[3]});
+                color: rgba({int(text_color[0]*255)}, {int(text_color[1]*255)}, {int(text_color[2]*255)}, 1.0);
+            }}
+            QPushButton:pressed {{
                 background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 rgba(200, 80, 80, 0.6),
-                    stop: 1 rgba(160, 40, 40, 0.7));
-            }
+                    stop: 0 rgba({int(bg_pressed[0]*255)}, {int(bg_pressed[1]*255)}, {int(bg_pressed[2]*255)}, 1.0),
+                    stop: 1 rgba({int(bg_pressed[0]*255*0.6)}, {int(bg_pressed[1]*255*0.6)}, {int(bg_pressed[2]*255*0.6)}, 1.0));
+                border: 2px solid rgba({int(border_color[0]*255)}, {int(border_color[1]*255)}, {int(border_color[2]*255)}, {border_color[3]});
+                color: rgba({int(text_color[0]*255)}, {int(text_color[1]*255)}, {int(text_color[2]*255)}, 1.0);
+            }}
         """)
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Single exit button
+        # Enhanced exit button with typography
         self.exit_btn = QPushButton("EXIT")
+        self.exit_btn.setFont(typography.get_caption_font(11))
         self.exit_btn.clicked.connect(self.exit_requested.emit)
         layout.addWidget(self.exit_btn)
 
@@ -316,7 +371,7 @@ class SabaWindow(QtWidgets.QWidget):
         self.drag_pos = None
         
     def setup_window(self):
-        """Setup the main window properties"""
+        """Setup the main window properties with enhanced JARVIS styling"""
         # Remove the default window frame but keep it as a normal window
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         
@@ -330,16 +385,20 @@ class SabaWindow(QtWidgets.QWidget):
         self.move(int((screen.width() - size.width()) / 2),
                   int((screen.height() - size.height()) / 2))
         
-        # Modern dark gradient background
-        self.setStyleSheet("""
-            QWidget {
+        # Enhanced dark gradient background with dynamic colors
+        bg_dark = color_scheme.palette.bg_dark
+        bg_medium = color_scheme.palette.bg_medium
+        border_color = color_scheme.get_color('accent', 0.3)
+        
+        self.setStyleSheet(f"""
+            QWidget {{
                 background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 rgba(8, 12, 20, 0.98),
-                    stop: 0.5 rgba(15, 20, 30, 0.98),
-                    stop: 1 rgba(10, 15, 25, 0.98));
-                border: 1px solid rgba(100, 150, 255, 0.3);
+                    stop: 0 rgba({int(bg_dark[0]*255)}, {int(bg_dark[1]*255)}, {int(bg_dark[2]*255)}, 0.98),
+                    stop: 0.5 rgba({int(bg_medium[0]*255)}, {int(bg_medium[1]*255)}, {int(bg_medium[2]*255)}, 0.98),
+                    stop: 1 rgba({int(bg_dark[0]*255)}, {int(bg_dark[1]*255)}, {int(bg_dark[2]*255)}, 0.98));
+                border: 1px solid rgba({int(border_color[0]*255)}, {int(border_color[1]*255)}, {int(border_color[2]*255)}, {border_color[3]});
                 border-radius: 12px;
-            }
+            }}
         """)
         
     def setup_ui(self):

@@ -10,6 +10,9 @@ from OpenGL.GLU import *
 
 from .models import SphereModel, LAT_STEPS, LON_STEPS, BASE_RADIUS
 from .audio_analyzer import AudioAnalyzer
+from .color_scheme import color_scheme
+from .visual_effects import geometric_patterns, holographic_effects, data_displays, particle_system
+from .typography import typography
 from config.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,81 +29,47 @@ class SabaGL(QOpenGLWidget):
         self.model = SphereModel()
         self.audio = AudioAnalyzer(wav_path)
         self.rotation = 0.0
+        
         # FPS tracking
         self._frame_counter = 0
         self._fps = 0.0
         self._last_fps_ts = time.time()
-        # Removed automatic audio playback - will be triggered manually via play() method
+        
+        # Timer for scene updates
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.update_scene)
         self.timer.start(int(1000 / FPS_TARGET))
-        # UI tuning knobs - J.A.R.V.I.S movie style (orange/golden energy)
-        self.glow_multiplier = 4.0  # Much larger glow for energy effect
-        self.glow_alpha = 0.25
-        self.core_alpha = 0.95
-        self.ring_alpha = 0.45
-        self.hud_alpha = 0.35
-        # Advanced effects - J.A.R.V.I.S style
-        self.fresnel_strength = 2.0  # Stronger rim lighting
-        self.scan_speed = 0.15  # Slower, more organic movement
-        self.scan_band_width = 0.35  # Wider energy bands
-        self.vignette_alpha = 0.32
-        self.grid_alpha = 0.18
-        # Energy colors - Orange/golden like the movie
-        self.energy_color_base = (1.0, 0.6, 0.2)  # Orange base
-        self.energy_color_bright = (1.0, 0.9, 0.4)  # Golden bright
-        self.energy_color_dim = (0.8, 0.3, 0.1)  # Deep orange
-        # Point density controls (uniform, grid-like sampling for cleanliness)
-        self.stride_lat_core = 2  # Increased density
+        
+        # Initialize color scheme to standby mode
+        color_scheme.set_mode("standby", 0.5)
+        
+        # Enhanced holographic effect parameters
+        self.effects_params = color_scheme.get_holographic_effects()
+        
+        # Point density controls for cleaner sampling
+        self.stride_lat_core = 2
         self.stride_lon_core = 2
-        self.stride_lat_glow = 1  # Even more dense for glow
+        self.stride_lat_glow = 1
         self.stride_lon_glow = 2
         self.sample_indices_core = self._build_strided_indices(self.stride_lat_core, self.stride_lon_core)
         self.sample_indices_glow = self._build_strided_indices(self.stride_lat_glow, self.stride_lon_glow)
-        # Optional scanline toggle for cleanliness
-        self.enable_scanline = True
-        # Surround HUD settings - Enhanced
-        self.outer_hud_radius = 0.85
-        self.outer_hud_alpha = 0.28
-        self.outer_hud_tick_alpha = 0.32
-        self.outer_hud_sweep_speed = 0.8
-        # Track audio playing state
+        
+        # Track audio and status
         self._audio_playing = False
-        # Status tracking
         self._current_status = "Standby"
-        # Enhanced sphere effects - modern and clean
+        
+        # Enhanced sphere effects
         self.sphere_breathing = True
-        self.particle_trails = False  # Disable for cleaner look
         self.energy_pulses = True
-        self.holographic_distortion = False  # Disable for cleaner look
-        
-        # JARVIS-style cinematic color scheme
-        self.energy_color_base = (0.2, 0.8, 1.0)  # Bright cyan-blue
-        self.energy_color_bright = (0.4, 0.9, 1.0)  # Bright cyan
-        self.energy_color_dim = (0.1, 0.5, 0.9)  # Deep blue
-        
-        # More cinematic visual parameters with better visibility
-        self.glow_multiplier = 2.8  # Increased glow visibility
-        self.glow_alpha = 0.4  # Much more visible glow
-        self.core_alpha = 0.95  # Very visible core
-        self.ring_alpha = 0.6  # More visible rings
-        self.hud_alpha = 0.25
-        self.vignette_alpha = 0.08  # Very subtle vignette
-        self.grid_alpha = 0.02  # Almost invisible grid
-        
-        # Smoother, more organic movement
-        self.fresnel_strength = 1.5
-        self.scan_speed = 0.05  # Very slow, organic scanning
-        self.scan_band_width = 0.15
         
         # Emit initial status
         self.status_update.emit("Interface Initialized", False)
 
     def initializeGL(self):
-        # Modern dark space background
-        glClearColor(0.02, 0.03, 0.05, 1.0)
+        # Near-black background for cinematic JARVIS look
+        glClearColor(0.02, 0.02, 0.05, 1.0)  # Very dark with subtle blue hint
         
-        # Enhanced point rendering for modern look
+        # Enhanced point rendering with superior anti-aliasing
         glEnable(GL_POINT_SMOOTH)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -108,16 +77,23 @@ class SabaGL(QOpenGLWidget):
         glEnable(GL_DEPTH_TEST)
         glHint(GL_POINT_SMOOTH_HINT, GL_NICEST)
         
-        # Enhanced line rendering
+        # Superior line rendering with anti-aliasing
         glEnable(GL_LINE_SMOOTH)
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
         
-        # Multi-sampling for better quality (if available)
+        # Multi-sampling anti-aliasing for crystal clear rendering
         glEnable(GL_MULTISAMPLE)
         
-        # Enhanced depth testing
+        # Enhanced depth testing with improved precision
         glDepthFunc(GL_LEQUAL)
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
+        
+        # Additional refinements for crystal clear visuals
+        glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST)
+        glEnable(GL_POLYGON_SMOOTH)
+        
+        # Improved color precision
+        glShadeModel(GL_SMOOTH)
 
     def resizeGL(self, w, h):
         glViewport(0, 0, w, h)
@@ -129,8 +105,11 @@ class SabaGL(QOpenGLWidget):
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # Enhanced background with more atmosphere
+        # Enhanced background with dynamic gradient
         self._draw_background_gradient()
+        
+        # Draw holographic scan lines overlay
+        holographic_effects.draw_scan_lines(self.width(), self.height())
 
         # 3D camera setup
         glLoadIdentity()
@@ -139,11 +118,21 @@ class SabaGL(QOpenGLWidget):
         glRotatef(self.rotation, 0, 1, 0)
 
         rms, spec = self.audio.analyze()
-        global_intensity = min(1.0, 0.6 + rms * 5.0)  # Higher base intensity for visibility
+        global_intensity = min(1.0, 0.6 + rms * 5.0)
         
-        # Add processing intensity boost when thinking
+        # Update color scheme based on current status
         if self._current_status == "Processing":
+            color_scheme.set_mode("processing", 0.5)
             global_intensity = max(global_intensity, 0.8 + math.sin(time.time() * 4.0) * 0.2)
+        elif self._current_status == "Listening":
+            color_scheme.set_mode("listening", 0.5)
+        elif self._current_status == "Playing Audio":
+            color_scheme.set_mode("active", 0.5)
+        else:
+            color_scheme.set_mode("standby", 0.5)
+        
+        # Get current effect parameters
+        effects = color_scheme.get_holographic_effects()
 
         # Enhanced sphere movement and breathing
         if rms > 0.02 or self._current_status == "Processing":
@@ -157,26 +146,26 @@ class SabaGL(QOpenGLWidget):
                 breath_scale += math.sin(time.time() * 3.0) * 0.02
             glScalef(breath_scale, breath_scale, breath_scale)
 
-        # Enhanced multi-pass rendering for highly visible JARVIS-style sphere
+        # Enhanced multi-pass rendering for JARVIS-style sphere
         
-        # Pass 1: Strong outer glow for visibility and depth
+        # Pass 1: Strong outer glow
         self._draw_sphere_points(
             global_intensity,
             spec,
-            alpha=self.glow_alpha * 0.8,
-            size_multiplier=self.glow_multiplier * 1.3,
+            alpha=effects['glow_alpha'],
+            size_multiplier=effects['glow_intensity'],
             depth_test=False,
             with_fresnel=False,
             with_scan=False,
             indices=self.sample_indices_glow,
         )
 
-        # Pass 2: Main sphere with strong visibility
+        # Pass 2: Main sphere core
         self._draw_sphere_points(
             global_intensity,
             spec,
-            alpha=self.core_alpha,
-            size_multiplier=1.2,  # Slightly larger points
+            alpha=effects['core_alpha'],
+            size_multiplier=1.2,
             depth_test=True,
             with_fresnel=True,
             with_scan=True,
@@ -184,26 +173,79 @@ class SabaGL(QOpenGLWidget):
             indices=self.sample_indices_core,
         )
         
-        # Pass 3: Bright inner core for energy center
+        # Pass 3: Bright inner core
         self._draw_sphere_points(
             global_intensity,
             spec,
-            alpha=min(1.0, self.core_alpha * 1.1),
+            alpha=min(1.0, effects['core_alpha'] * 1.1),
             size_multiplier=0.6,
             depth_test=True,
             with_fresnel=False,
             with_scan=True,
             indices=self.sample_indices_core,
         )
+        
+        # Central glowing power core
+        self._draw_central_core(global_intensity, effects)
 
-        # Enhanced orbiting rings with cleaner look
-        self._draw_orbit_rings(global_intensity)
+        # Enhanced orbiting rings
+        self._draw_orbit_rings(global_intensity, effects)
+        
+        # Draw advanced geometric patterns
+        geometric_patterns.draw_wireframe_sphere(
+            (0, 0, 0), 
+            BASE_RADIUS * 1.8, 
+            segments=24, 
+            alpha=0.1
+        )
+        
+        # Draw holographic distortion effects
+        holographic_effects.draw_holographic_distortion(
+            (0, 0, 0), 
+            BASE_RADIUS, 
+            global_intensity
+        )
+        
+        # Update and draw enhanced particle trails
+        particle_system.update_particles()
+        if rms > 0.05:  # Add varied particles during high activity
+            import random
+            for _ in range(int(rms * 8)):  # More particles for better effect
+                # Generate particles from sphere surface with magnetic field influence
+                angle1 = random.uniform(0, 2 * math.pi)
+                angle2 = random.uniform(0, math.pi)
+                
+                # Position on sphere surface
+                sphere_radius = BASE_RADIUS * random.uniform(0.8, 1.1)
+                pos = (
+                    sphere_radius * math.sin(angle2) * math.cos(angle1),
+                    sphere_radius * math.cos(angle2),
+                    sphere_radius * math.sin(angle2) * math.sin(angle1)
+                )
+                
+                # Velocity with outward bias and some tangential component
+                vel_magnitude = random.uniform(0.3, 1.2) * rms
+                vel = (
+                    pos[0] * vel_magnitude * 0.5 + random.uniform(-0.3, 0.3),
+                    pos[1] * vel_magnitude * 0.3 + random.uniform(-0.2, 0.4),
+                    pos[2] * vel_magnitude * 0.5 + random.uniform(-0.3, 0.3)
+                )
+                
+                particle_system.add_spark_particle(pos, vel, intensity=rms)
+        
+        particle_system.draw_particles()
+
+        # Draw subtle background grid for depth
+        self._draw_background_grid(effects)
 
         # Minimal HUD elements
-        self._draw_hud_overlay()
+        self._draw_hud_overlay(effects)
 
         # Subtle vignette for cinematic effect
-        self._draw_vignette_overlay()
+        self._draw_vignette_overlay(effects)
+        
+        # Screen-wide scan line overlay for holographic feel
+        self._draw_scanline_overlay(effects)
 
     def load_audio(self, wav_path):
         """Load a new audio file and restart audio analysis."""
@@ -250,16 +292,12 @@ class SabaGL(QOpenGLWidget):
         """Set visual indicators for when Saba is thinking/processing"""
         if thinking:
             self._current_status = "Processing"
+            color_scheme.set_mode("processing", 1.0)
             self.status_update.emit("Processing Input", True)
-            # Increase scan speed and intensity when thinking
-            self.scan_speed = 0.8
-            self.fresnel_strength = 2.0
         else:
             self._current_status = "Standby"
+            color_scheme.set_mode("standby", 1.0)
             self.status_update.emit("Standby", False)
-            # Return to normal visual parameters
-            self.scan_speed = 0.35
-            self.fresnel_strength = 1.2
 
     def update_scene(self):
         rms, spec = self.audio.analyze()
@@ -290,7 +328,7 @@ class SabaGL(QOpenGLWidget):
     # ---------- Saba-style UI helpers ----------
 
     def _draw_background_gradient(self):
-        """Modern clean gradient background."""
+        """Enhanced holographic background with subtle grid pattern."""
         glDisable(GL_DEPTH_TEST)
 
         # Save matrices
@@ -303,33 +341,69 @@ class SabaGL(QOpenGLWidget):
         glPushMatrix()
         glLoadIdentity()
 
-        # Modern gradient background
+        current_time = time.time()
+        
+        # Base background gradient (near-black with subtle variations)
         glBegin(GL_QUADS)
-        # Bottom (dark blue-black)
-        glColor4f(0.02, 0.03, 0.06, 1.0)
+        # Bottom - very dark with subtle red tint
+        glColor4f(0.02, 0.01, 0.03, 1.0)
         glVertex2f(-1.0, -1.0)
         glVertex2f(1.0, -1.0)
-        # Top (slightly lighter blue-black)
-        glColor4f(0.04, 0.06, 0.10, 1.0)
+        # Top - dark with subtle blue tint
+        glColor4f(0.01, 0.02, 0.05, 1.0)
         glVertex2f(1.0, 1.0)
         glVertex2f(-1.0, 1.0)
         glEnd()
         
-        # Subtle center glow (much more subtle than before)
-        glBegin(GL_TRIANGLE_FAN)
-        # Center with very faint blue glow
-        glColor4f(0.05, 0.10, 0.15, 0.08)
-        glVertex2f(0.0, 0.0)
-        # Edge completely dark
-        steps = 32
-        for i in range(steps + 1):
-            angle = 2.0 * math.pi * (i / float(steps))
-            x = math.cos(angle) * 1.2
-            y = math.sin(angle) * 1.2
-            glColor4f(0.02, 0.03, 0.05, 0.0)
-            glVertex2f(x, y)
+        # Holographic grid pattern overlay
+        grid_alpha = 0.04 + 0.02 * math.sin(current_time * 0.6)
+        grid_color = (0.0, 0.2, 0.4, grid_alpha)  # Subtle cyan grid
+        
+        glEnable(GL_LINE_SMOOTH)
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
+        glLineWidth(0.3)
+        glColor4f(*grid_color)
+        
+        # Vertical grid lines with subtle animation
+        for x in [-0.8, -0.4, 0.0, 0.4, 0.8]:
+            x_offset = x + 0.005 * math.sin(current_time * 0.3 + x * 3.0)
+            glBegin(GL_LINES)
+            glVertex2f(x_offset, -1.0)
+            glVertex2f(x_offset, 1.0)
+            glEnd()
+        
+        # Horizontal grid lines with subtle animation
+        for y in [-0.6, -0.2, 0.2, 0.6]:
+            y_offset = y + 0.004 * math.cos(current_time * 0.4 + y * 3.5)
+            glBegin(GL_LINES)
+            glVertex2f(-1.0, y_offset)
+            glVertex2f(1.0, y_offset)
+            glEnd()
+        
+        # Floating particles for depth
+        glPointSize(1.2)
+        particle_color = (0.05, 0.3, 0.6, 0.15)
+        
+        glBegin(GL_POINTS)
+        # Background particles with subtle movement
+        for i in range(12):
+            # Pseudo-random positions
+            base_x = math.sin(i * 2.1) * 0.9
+            base_y = math.cos(i * 1.8) * 0.8
+            
+            # Slow drift animation
+            drift_x = base_x + 0.02 * math.sin(current_time * 0.2 + i)
+            drift_y = base_y + 0.015 * math.cos(current_time * 0.15 + i * 1.3)
+            
+            # Subtle twinkle
+            twinkle = 1.0 + 0.4 * math.sin(current_time * 1.5 + i * 0.7)
+            particle_alpha = particle_color[3] * twinkle
+            
+            if particle_alpha > 0.05:
+                glColor4f(particle_color[0], particle_color[1], particle_color[2], particle_alpha)
+                glVertex2f(drift_x, drift_y)
         glEnd()
-
+        
         # Restore matrices
         glPopMatrix()
         glMatrixMode(GL_PROJECTION)
@@ -454,34 +528,42 @@ class SabaGL(QOpenGLWidget):
                     indices.append(idx)
         return np.array(indices, dtype=np.int32)
 
-    def _draw_sphere_points(self, global_intensity, spec, alpha=0.9, size_multiplier=1.0, depth_test=True, with_fresnel=False, with_scan=False, with_backface_fade=False, indices=None):
-        """Draw sphere points with J.A.R.V.I.S movie-style organic energy patterns."""
+    def _draw_sphere_points(self, global_intensity, spec, alpha=0.9, size_multiplier=1.0, 
+                           depth_test=True, with_fresnel=False, with_scan=False, 
+                           with_backface_fade=False, indices=None):
+        """Draw sphere points with crystal clear, refined JARVIS-style rendering."""
         if depth_test:
             glEnable(GL_DEPTH_TEST)
         else:
             glDisable(GL_DEPTH_TEST)
 
-        # Dynamic point size based on energy intensity
+        # Get current effect parameters
+        effects = color_scheme.get_holographic_effects()
+
+        # Refined point sizing for crystal clarity
         if hasattr(self.model.sizes, '__len__') and len(self.model.sizes) > 0:
             avg_size = float(np.sum(self.model.sizes)) / float(len(self.model.sizes))
         else:
-            avg_size = 4.0
+            avg_size = 3.5  # Slightly smaller for better definition
         
-        # Larger, more organic points
-        base_size = max(2.0, avg_size * size_multiplier * 1.2)
+        # Crystal clear point sizing
+        base_size = max(2.5, avg_size * size_multiplier * 1.0)  # Reduced multiplier for clarity
         glPointSize(base_size)
+        
+        # Enhanced blending for crystal clear edges
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         glBegin(GL_POINTS)
         current_time = time.time()
         
-        # Slower, more organic time for flowing patterns
-        flow_time = current_time * 0.08
-        energy_time = current_time * 0.25
+        # Refined organic time flows with smoother animation
+        flow_time = current_time * effects['scan_speed'] * 1.5
+        energy_time = current_time * effects['pulse_speed'] * 0.8
         
-        # Create organic flow patterns
-        wave_phase1 = math.sin(energy_time * 0.7) * 2.0
-        wave_phase2 = math.cos(energy_time * 0.5) * 1.8
-        wave_phase3 = math.sin(energy_time * 1.2) * 1.5
+        # Smoother wave patterns for refined look
+        wave_phase1 = math.sin(energy_time * 0.6) * 1.8
+        wave_phase2 = math.cos(energy_time * 0.4) * 1.5
+        wave_phase3 = math.sin(energy_time * 1.0) * 1.2
         
         # Model rotations for fresnel/backface calculations
         rot_y = math.radians(self.rotation)
@@ -489,10 +571,10 @@ class SabaGL(QOpenGLWidget):
         rot_x = math.radians(20.0)
         cx, sx = math.cos(rot_x), math.sin(rot_x)
 
-        # Energy flow center that moves organically
-        flow_center_x = math.sin(energy_time * 0.3) * 0.8
-        flow_center_y = math.cos(energy_time * 0.4) * 0.6
-        flow_center_z = math.sin(energy_time * 0.35) * 0.7
+        # More stable energy flow centers
+        flow_center_x = math.sin(energy_time * 0.25) * 0.6
+        flow_center_y = math.cos(energy_time * 0.3) * 0.5
+        flow_center_z = math.sin(energy_time * 0.28) * 0.55
 
         if indices is None:
             indices_iter = range(len(self.model.vertices))
@@ -505,34 +587,33 @@ class SabaGL(QOpenGLWidget):
             phase = self.model.phases[idx]
             sensitivity = self.model.sensitivity[idx]
 
-            # Organic energy flow calculation
-            # Distance from flowing energy centers
+            # Refined energy flow calculation
             dist_to_flow = math.sqrt(
                 (vx - flow_center_x)**2 + 
                 (vy - flow_center_y)**2 + 
                 (vz - flow_center_z)**2
             ) / BASE_RADIUS
             
-            # Multiple overlapping wave patterns for organic look
-            wave1 = math.sin(phase + flow_time * 3.0 + wave_phase1)
-            wave2 = math.cos(phase * 1.7 + flow_time * 2.3 + wave_phase2)
-            wave3 = math.sin(phase * 0.8 + flow_time * 1.8 + wave_phase3)
+            # Smoother wave patterns for cleaner look
+            wave1 = math.sin(phase + flow_time * 2.5 + wave_phase1)
+            wave2 = math.cos(phase * 1.5 + flow_time * 2.0 + wave_phase2)
+            wave3 = math.sin(phase * 0.7 + flow_time * 1.5 + wave_phase3)
             
-            # Combine waves for organic displacement
-            organic_pattern = (wave1 + wave2 * 0.7 + wave3 * 0.5) / 3.0
+            # More subtle organic pattern for refined appearance
+            organic_pattern = (wave1 + wave2 * 0.6 + wave3 * 0.4) / 3.2
             
-            # Energy flow effect - points closer to flow center are brighter
-            flow_intensity = max(0.2, 1.0 - dist_to_flow * 0.8)
-            flow_displacement = organic_pattern * 0.08 * flow_intensity
+            # Enhanced but more subtle energy flow effect
+            flow_intensity = max(0.3, 1.0 - dist_to_flow * 0.7)
+            flow_displacement = organic_pattern * 0.06 * flow_intensity  # Reduced for clarity
             
-            # Audio response
+            # Audio response with better control
             band_value = 0.0
             if spec is not None:
                 latitude_band = int(((ny + 1.0) * 0.5) * len(spec))
                 band_value = spec[min(len(spec) - 1, latitude_band)] if latitude_band < len(spec) else 0.0
 
-            # Total displacement with audio response
-            audio_displacement = sensitivity * band_value * 0.15
+            # More controlled displacement
+            audio_displacement = sensitivity * band_value * 0.12  # Reduced for cleaner look
             total_displacement = flow_displacement + audio_displacement
             
             # Apply displacement
@@ -540,14 +621,14 @@ class SabaGL(QOpenGLWidget):
             py = vy + ny * total_displacement
             pz = vz + nz * total_displacement
 
-            # Energy intensity calculation
-            base_intensity = global_intensity * (0.4 + 0.6 * sensitivity)
-            flow_boost = flow_intensity * 0.6
-            audio_boost = audio_displacement * 3.0
+            # Enhanced energy intensity with better range control
+            base_intensity = global_intensity * (0.5 + 0.5 * sensitivity)  # Better base range
+            flow_boost = flow_intensity * 0.4  # Reduced for subtlety
+            audio_boost = audio_displacement * 2.5
             
             intensity = min(1.0, base_intensity + flow_boost + audio_boost)
 
-            # Fresnel rim lighting for energy edge effect
+            # Refined fresnel rim lighting
             view_nz = 0.0
             if with_fresnel or with_backface_fade:
                 # Transform normal to view space
@@ -561,99 +642,464 @@ class SabaGL(QOpenGLWidget):
                 
                 if with_fresnel:
                     fresnel = max(0.0, 1.0 - abs(view_nz))
-                    intensity += self.fresnel_strength * (fresnel ** 1.8) * flow_intensity
+                    intensity += effects['fresnel_strength'] * 0.8 * (fresnel ** 2.0) * flow_intensity
 
-            # Energy band scanning (slower, more organic)
+            # Enhanced energy band scanning with cleaner edges
             if with_scan:
-                scan_center_y = math.sin(current_time * self.scan_speed * 0.7) * (BASE_RADIUS * 0.8)
-                scan_thickness = self.scan_band_width * BASE_RADIUS * 0.6
+                scan_center_y = math.sin(current_time * effects['scan_speed'] * 0.8) * (BASE_RADIUS * 0.7)
+                scan_thickness = effects['scan_width'] * BASE_RADIUS * 0.5
                 dy = abs(vy - scan_center_y)
                 if dy < scan_thickness:
                     scan_factor = 1.0 - (dy / scan_thickness)
-                    intensity += 0.4 * (scan_factor ** 1.5) * flow_intensity
+                    # Smoother scan band edges
+                    scan_intensity = 0.3 * (scan_factor ** 2.0) * flow_intensity
+                    intensity += scan_intensity
 
-            # J.A.R.V.I.S orange/golden color scheme
-            # Base color depends on energy intensity and position
+            # JARVIS-style warm gold color with dynamic ripple effects
             energy_mix = intensity * flow_intensity
             
-            if energy_mix > 0.7:  # Bright energy - golden
-                r, g, b = self.energy_color_bright
-                color_alpha = alpha * min(1.0, energy_mix)
-            elif energy_mix > 0.3:  # Medium energy - orange
-                r, g, b = self.energy_color_base
-                color_alpha = alpha * energy_mix
-            else:  # Low energy - deep orange
-                r, g, b = self.energy_color_dim
-                color_alpha = alpha * energy_mix * 0.8
+            # Add holographic ripple waves across the surface
+            surface_ripple = math.sin(vx * 8.0 + current_time * 3.5) * math.cos(vy * 6.0 + current_time * 2.8)
+            surface_ripple += math.sin(vz * 7.0 + current_time * 4.2) * 0.5
+            ripple_intensity = energy_mix * (1.0 + surface_ripple * 0.2)
             
-            # Add some variation based on position for organic look
-            pos_variation = (math.sin(vx * 0.5) + math.cos(vy * 0.7) + math.sin(vz * 0.6)) / 3.0
-            r += pos_variation * 0.1 * flow_intensity
-            g += pos_variation * 0.05 * flow_intensity
-            b += pos_variation * 0.02 * flow_intensity
+            # Low-frequency pulse across the entire sphere
+            global_pulse = 1.0 + 0.15 * math.sin(current_time * 1.2)
+            pulse_intensity = ripple_intensity * global_pulse
             
-            # Clamp colors
-            r = max(0.0, min(1.0, r))
-            g = max(0.0, min(1.0, g))
-            b = max(0.0, min(1.0, b))
-
-            # Backface fading for depth
-            final_alpha = color_alpha
+            # Warm gold color palette for JARVIS aesthetic with dynamic variations
+            if pulse_intensity > 0.8:
+                # Bright gold for high energy with ripple enhancement
+                base_color = (1.0, 0.9, 0.35, alpha * 0.95)
+                color = (
+                    base_color[0] * pulse_intensity * 1.1,
+                    base_color[1] * pulse_intensity * 1.0,
+                    base_color[2] * pulse_intensity * 0.85,
+                    base_color[3]
+                )
+            elif pulse_intensity > 0.5:
+                # Medium warm gold with shimmer
+                base_color = (0.95, 0.75, 0.3, alpha * 0.9)
+                shimmer = 1.0 + 0.1 * math.sin(phase + current_time * 5.0)
+                color = (
+                    base_color[0] * pulse_intensity * shimmer,
+                    base_color[1] * pulse_intensity * shimmer * 0.95,
+                    base_color[2] * pulse_intensity * shimmer * 0.8,
+                    base_color[3]
+                )
+            else:
+                # Deep amber for low energy areas with subtle glow
+                base_color = (0.85, 0.6, 0.25, alpha * 0.8)
+                color = (
+                    base_color[0] * pulse_intensity * 0.9,
+                    base_color[1] * pulse_intensity * 0.9,
+                    base_color[2] * pulse_intensity * 0.75,
+                    base_color[3]
+                )
+            
+            # Holographic field effect - makes wireframe appear as energy field
+            holographic_boost = 0.2 * math.sin(current_time * 4.0 + phase) * flow_intensity
+            color = (
+                min(1.0, color[0] + holographic_boost),
+                min(1.0, color[1] + holographic_boost * 0.8),
+                min(1.0, color[2] + holographic_boost * 0.5),
+                color[3]
+            )
+            
+            # Refined backface fading for crystal clear depth
             if with_backface_fade and view_nz != 0.0:
-                facing = max(0.0, 0.3 + 0.7 * (-view_nz))
-                final_alpha *= 0.4 + 0.6 * facing
+                facing = max(0.0, 0.4 + 0.6 * (-view_nz))  # Better depth perception
+                final_alpha = color[3] * (0.5 + 0.5 * facing)
+                color = (color[0], color[1], color[2], final_alpha)
 
-            glColor4f(r * intensity, g * intensity, b * intensity, final_alpha)
+            glColor4f(*color)
             glVertex3f(px, py, pz)
             
         glEnd()
+        
+        # Reset blending to standard
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        
+    def _draw_central_core(self, global_intensity, effects):
+        """Draw the central shimmering power core with holographic ripples."""
+        glDisable(GL_DEPTH_TEST)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE)  # Additive blending for glow
+        
+        current_time = time.time()
+        
+        # Advanced pulsing with multiple harmonics for organic feel
+        pulse1 = 1.0 + 0.3 * math.sin(current_time * 2.2)
+        pulse2 = 1.0 + 0.2 * math.sin(current_time * 3.7)
+        pulse3 = 1.0 + 0.15 * math.sin(current_time * 1.8)
+        core_intensity = global_intensity * (pulse1 * pulse2 * pulse3) * 0.4
+        
+        # Shimmering effect with ripple waves
+        shimmer = 1.0 + 0.4 * math.sin(current_time * 6.5) * math.cos(current_time * 4.2)
+        
+        # Multi-layer core for depth and complexity
+        core_layers = [
+            {'size': 15.0, 'color': (1.0, 1.0, 0.95, 0.6), 'intensity': 1.4, 'shimmer': True},  # Outer shimmer
+            {'size': 10.0, 'color': (1.0, 0.95, 0.8, 0.8), 'intensity': 1.2, 'shimmer': True},  # Bright white core
+            {'size': 7.0, 'color': (1.0, 0.85, 0.3, 0.95), 'intensity': 1.0, 'shimmer': False}, # Warm yellow
+            {'size': 4.0, 'color': (1.0, 0.7, 0.1, 1.0), 'intensity': 0.8, 'shimmer': False},   # Golden center
+            {'size': 2.0, 'color': (0.9, 0.6, 0.05, 1.0), 'intensity': 0.6, 'shimmer': False}, # Deep core
+        ]
+        
+        for layer in core_layers:
+            size = layer['size']
+            color = layer['color']
+            intensity = layer['intensity'] * core_intensity
+            
+            # Apply shimmer effect to outer layers
+            if layer['shimmer']:
+                intensity *= (1.0 + shimmer * 0.3)
+            
+            # Apply intensity to color with subtle variations
+            final_color = (
+                min(1.0, color[0] * intensity),
+                min(1.0, color[1] * intensity),
+                min(1.0, color[2] * intensity),
+                color[3] * global_intensity * 0.9
+            )
+            
+            glPointSize(size)
+            glColor4f(*final_color)
+            
+            glBegin(GL_POINTS)
+            # Add subtle position variation for shimmer
+            if layer['shimmer']:
+                shimmer_x = math.sin(current_time * 8.3) * 0.01
+                shimmer_y = math.cos(current_time * 7.1) * 0.01
+                glVertex3f(shimmer_x, shimmer_y, 0.0)
+            else:
+                glVertex3f(0.0, 0.0, 0.0)
+            glEnd()
+        
+        # Add reflective highlight - moving point of light on sphere surface
+        self._draw_sphere_highlight(core_intensity, global_intensity, current_time)
+        
+        # Holographic ripple rings around core
+        glLineWidth(1.0)
+        ripple_time = current_time * 2.5
+        
+        for ripple_idx in range(5):
+            # Ripple expands outward from center
+            base_radius = 0.05 + ripple_idx * 0.04
+            ripple_phase = ripple_time - ripple_idx * 0.8
+            ripple_radius = base_radius + 0.02 * math.sin(ripple_phase)
+            
+            # Fading ripples
+            ripple_alpha = max(0.0, 0.4 * math.cos(ripple_phase * 0.5))
+            
+            if ripple_alpha > 0.05:  # Only draw visible ripples
+                ripple_color = (
+                    0.8 * core_intensity,
+                    0.6 * core_intensity,
+                    0.2 * core_intensity,
+                    ripple_alpha * global_intensity
+                )
+                glColor4f(*ripple_color)
+                
+                glBegin(GL_LINE_LOOP)
+                segments = 20
+                for i in range(segments):
+                    angle = 2.0 * math.pi * i / segments
+                    x = math.cos(angle) * ripple_radius
+                    y = math.sin(angle) * ripple_radius
+                    # Add subtle 3D ripple effect
+                    z = math.sin(angle * 3.0 + ripple_phase) * 0.005
+                    glVertex3f(x, y, z)
+                glEnd()
+        
+        # Energy field patterns rotating around core
+        glLineWidth(1.2)
+        field_rotation = current_time * 1.2
+        
+        for field_idx in range(4):
+            field_radius = 0.18 + field_idx * 0.03
+            rotation_offset = field_idx * (math.pi / 2)
+            field_phase = field_rotation + rotation_offset
+            
+            # Energy field color with variation
+            field_intensity = 0.8 + 0.3 * math.sin(current_time * 3.0 + field_idx)
+            field_color = (
+                0.9 * core_intensity * field_intensity,
+                0.5 * core_intensity * field_intensity,
+                0.1 * core_intensity * field_intensity,
+                0.3 * global_intensity
+            )
+            glColor4f(*field_color)
+            
+            # Draw energy field segments (not complete circles)
+            segments_per_ring = 12
+            segment_gap = 2  # Gap between segments
+            
+            for seg in range(0, segments_per_ring, segment_gap):
+                glBegin(GL_LINE_STRIP)
+                for i in range(segment_gap):
+                    if seg + i < segments_per_ring:
+                        angle = (2.0 * math.pi * (seg + i) / segments_per_ring) + field_phase
+                        x = math.cos(angle) * field_radius
+                        y = math.sin(angle) * field_radius
+                        # Dynamic Z variation for 3D field effect
+                        z = math.sin(angle * 2.0 + current_time * 1.5) * 0.015
+                        glVertex3f(x, y, z)
+                glEnd()
+        
+        # Reset blending and depth test
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_DEPTH_TEST)
 
-    def _draw_orbit_rings(self, global_intensity):
-        """Draw minimal modern energy rings."""
+    def _draw_sphere_highlight(self, core_intensity, global_intensity, current_time):
+        """Draw reflective highlight that moves across the sphere surface."""
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE)
+        
+        # Moving light source simulation
+        light_angle = current_time * 0.8  # Slow rotation
+        light_height = 0.6 + 0.3 * math.sin(current_time * 0.3)  # Subtle vertical movement
+        
+        # Calculate highlight position on sphere surface
+        highlight_x = BASE_RADIUS * 0.3 * math.cos(light_angle)
+        highlight_y = BASE_RADIUS * light_height * 0.5
+        highlight_z = BASE_RADIUS * 0.3 * math.sin(light_angle)
+        
+        # Multiple highlight layers for realistic reflection
+        highlight_layers = [
+            {'size': 8.0, 'intensity': 1.0, 'color': (1.0, 1.0, 1.0)},  # Bright core
+            {'size': 12.0, 'intensity': 0.6, 'color': (1.0, 0.95, 0.9)}, # Warm glow
+            {'size': 16.0, 'intensity': 0.3, 'color': (1.0, 0.9, 0.8)},   # Outer softness
+        ]
+        
+        for layer in highlight_layers:
+            size = layer['size']
+            intensity = layer['intensity'] * core_intensity * 0.8
+            color = layer['color']
+            
+            # Distance-based fading (simulate sphere curvature)
+            distance_fade = 1.0 - min(1.0, math.sqrt(highlight_x**2 + highlight_z**2) / (BASE_RADIUS * 0.5))
+            
+            final_alpha = intensity * global_intensity * distance_fade * 0.7
+            glColor4f(color[0], color[1], color[2], final_alpha)
+            glPointSize(size)
+            
+            glBegin(GL_POINTS)
+            glVertex3f(highlight_x, highlight_y, highlight_z)
+            glEnd()
+        
+        # Additional subtle gradient sheen across the sphere
+        sheen_segments = 12
+        sheen_alpha = 0.15 * core_intensity * global_intensity
+        
+        glLineWidth(1.0)
+        glColor4f(1.0, 0.95, 0.85, sheen_alpha)
+        
+        # Draw subtle curved lines to suggest sphere surface
+        glBegin(GL_LINE_STRIP)
+        for i in range(sheen_segments + 1):
+            angle = (light_angle + math.pi/4) + (i / float(sheen_segments)) * math.pi/2
+            sheen_radius = BASE_RADIUS * 0.8
+            
+            x = sheen_radius * math.cos(angle) * 0.7
+            y = sheen_radius * math.sin(angle * 0.5) * 0.3
+            z = sheen_radius * math.sin(angle) * 0.7
+            
+            # Fade at edges
+            edge_fade = math.sin((i / float(sheen_segments)) * math.pi)
+            glColor4f(1.0, 0.95, 0.85, sheen_alpha * edge_fade)
+            glVertex3f(x, y, z)
+        glEnd()
+        
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_DEPTH_TEST)
+
+    def _draw_orbit_rings(self, global_intensity, effects):
+        """Draw vibrant glowing orbital rings with JARVIS-style red/orange energy."""
+        # Superior line rendering for crystal clarity
         glEnable(GL_LINE_SMOOTH)
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
-        glLineWidth(1.0)
+        glLineWidth(2.0)  # Thicker for vibrant glow effect
 
         time_s = time.time()
-        energy_time = time_s * 0.2
+        energy_time = time_s * effects['pulse_speed'] * 0.6
 
-        # Only two rings but more visible
+        # Enhanced ring configurations for dynamic motion
         ring_configs = [
-            {'radius': BASE_RADIUS * 1.2, 'speed': 0.5, 'alpha_mult': 1.0},
-            {'radius': BASE_RADIUS * 1.6, 'speed': 0.3, 'alpha_mult': 0.7},
+            {'radius': BASE_RADIUS * 1.15, 'speed': 0.5, 'alpha_mult': 1.0, 'tilt': 15.0, 'thickness': 2.5, 'color_shift': 0.0},
+            {'radius': BASE_RADIUS * 1.5, 'speed': -0.3, 'alpha_mult': 0.85, 'tilt': -10.0, 'thickness': 2.0, 'color_shift': 1.0},
+            {'radius': BASE_RADIUS * 1.9, 'speed': 0.2, 'alpha_mult': 0.6, 'tilt': 25.0, 'thickness': 1.5, 'color_shift': 2.0},
         ]
 
         for i, config in enumerate(ring_configs):
             radius = config['radius']
             speed = config['speed']
             alpha_mult = config['alpha_mult']
+            tilt = config['tilt']
+            thickness = config['thickness']
+            color_shift = config['color_shift']
             
             glPushMatrix()
             
-            rotation_angle = (energy_time * speed * 10.0) % 360.0
-            tilt_x = 15.0
+            # Dynamic rotation with varying speeds
+            rotation_angle = (energy_time * speed * 12.0) % 360.0
             
             glRotatef(rotation_angle, 0, 1, 0)
-            glRotatef(tilt_x, 1, 0, 0)
+            glRotatef(tilt, 1, 0, 0)
 
-            base_alpha = self.ring_alpha * alpha_mult * global_intensity
+            base_alpha = effects['ring_alpha'] * alpha_mult * global_intensity * 1.4
 
-            # Draw visible ring
-            segments = 80
-            glColor4f(*self.energy_color_base, base_alpha)
+            # Vibrant red/orange color palette for orbital rings
+            energy_phase = energy_time + color_shift
+            energy_intensity = global_intensity * 1.2
             
-            glBegin(GL_LINE_LOOP)
-            for s in range(segments):
-                angle = 2.0 * math.pi * (s / float(segments))
-                x = math.cos(angle) * radius
-                z = math.sin(angle) * radius
-                y = 0.0
+            if i == 0:  # Inner ring - bright vibrant orange
+                ring_color = (
+                    1.0 * energy_intensity,                    # Full red
+                    0.6 * energy_intensity,                    # Orange mix
+                    0.1 * energy_intensity,                    # Minimal blue for warmth
+                    base_alpha * 1.2
+                )
+            elif i == 1:  # Middle ring - deep red-orange
+                ring_color = (
+                    0.9 * energy_intensity,
+                    0.4 * energy_intensity,
+                    0.05 * energy_intensity,
+                    base_alpha * 1.0
+                )
+            else:  # Outer ring - darker red with subtle orange
+                ring_color = (
+                    0.8 * energy_intensity,
+                    0.3 * energy_intensity,
+                    0.02 * energy_intensity,
+                    base_alpha * 0.8
+                )
+            
+            # Add pulsing energy effect
+            pulse = 1.0 + 0.3 * math.sin(energy_phase * 2.0)
+            ring_color = (
+                min(1.0, ring_color[0] * pulse),
+                min(1.0, ring_color[1] * pulse),
+                min(1.0, ring_color[2] * pulse),
+                ring_color[3]
+            )
+            
+            # Set line thickness for this ring
+            glLineWidth(thickness)
+            
+            # Draw segmented flowing light paths instead of solid rings
+            segments_total = 180  # More segments for smoother flow
+            segment_length = 8    # Length of each light segment
+            segment_gap = 4       # Gap between segments
+            flow_speed = energy_time * 2.0 + i * 0.8  # Different flow speeds per ring
+            
+            glColor4f(*ring_color)
+            
+            # Draw flowing segments of light
+            for start_seg in range(0, segments_total, segment_length + segment_gap):
+                # Calculate flow offset for this segment
+                flow_offset = (flow_speed + start_seg * 0.1) % segments_total
+                
+                glBegin(GL_LINE_STRIP)
+                for seg_step in range(segment_length):
+                    seg_index = (start_seg + seg_step + int(flow_offset)) % segments_total
+                    angle = 2.0 * math.pi * (seg_index / float(segments_total))
+                    
+                    # Segment intensity fades at edges for light trail effect
+                    fade_factor = 1.0
+                    if seg_step < 2:  # Fade in at start
+                        fade_factor = seg_step / 2.0
+                    elif seg_step > segment_length - 3:  # Fade out at end
+                        fade_factor = (segment_length - seg_step) / 2.0
+                    
+                    # Apply fade to color
+                    segment_color = (
+                        ring_color[0] * fade_factor,
+                        ring_color[1] * fade_factor,
+                        ring_color[2] * fade_factor,
+                        ring_color[3] * fade_factor
+                    )
+                    glColor4f(*segment_color)
+                    
+                    # Energy flow variation with data-stream feel
+                    flow_variation = 1.0 + 0.05 * math.sin(angle * 3.0 + energy_time * 3.0)
+                    r = radius * flow_variation
+                    
+                    x = math.cos(angle) * r
+                    z = math.sin(angle) * r
+                    y = math.sin(angle * 2.0 + energy_time * 0.8) * 0.02  # Subtle Y variation
+                    glVertex3f(x, y, z)
+                glEnd()
+            
+            # Add bright energy nodes that travel along the paths
+            node_color = (
+                min(1.0, ring_color[0] * 1.8),
+                min(1.0, ring_color[1] * 1.8),
+                min(1.0, ring_color[2] * 1.8),
+                min(1.0, ring_color[3] * 1.5)
+            )
+            glColor4f(*node_color)
+            glPointSize(thickness * 2.0)
+            
+            # Draw traveling energy nodes
+            node_count = 3 + i  # More nodes on outer rings
+            glBegin(GL_POINTS)
+            for node_idx in range(node_count):
+                node_phase = (energy_time * 1.5 + node_idx * (2.0 * math.pi / node_count)) % (2.0 * math.pi)
+                node_angle = node_phase
+                
+                # Node position with slight variation
+                node_variation = 1.0 + 0.03 * math.sin(node_angle * 4.0 + energy_time * 2.0)
+                r = radius * node_variation
+                
+                x = math.cos(node_angle) * r
+                z = math.sin(node_angle) * r
+                y = math.sin(node_angle * 2.0 + energy_time * 0.8) * 0.02
                 glVertex3f(x, y, z)
             glEnd()
+            
+            # Dynamic energy segments with light trails
+            if i == 0:  # Only on innermost ring for focus
+                # Bright energy trail color
+                trail_color = (
+                    1.0 * energy_intensity * 1.3,
+                    0.8 * energy_intensity * 1.3,
+                    0.2 * energy_intensity * 1.3,
+                    base_alpha * 1.6
+                )
                 
+                glLineWidth(3.0)  # Thicker for energy trails
+                
+                # Moving energy segments with fade trails
+                for seg in range(3):  # Multiple energy points
+                    seg_angle = (energy_time * 1.2 + seg * (2.0 * math.pi / 3)) % (2.0 * math.pi)
+                    trail_length = 0.6  # Longer trail for motion effect
+                    
+                    glBegin(GL_LINE_STRIP)
+                    for step in range(20):  # More steps for smoother trails
+                        angle = seg_angle + (step / 20.0) * trail_length
+                        
+                        # Exponential fade for realistic light trails
+                        intensity_fade = math.exp(-step * 0.15)
+                        
+                        trail_color_faded = (
+                            trail_color[0] * intensity_fade,
+                            trail_color[1] * intensity_fade,
+                            trail_color[2] * intensity_fade,
+                            trail_color[3] * intensity_fade
+                        )
+                        glColor4f(*trail_color_faded)
+                        
+                        # Calculate position on ring with smooth motion
+                        x = math.cos(angle) * radius
+                        z = math.sin(angle) * radius
+                        y = 0.0
+                        glVertex3f(x, y, z)
+                    glEnd()
+            
             glPopMatrix()
 
+        # Reset line width
         glLineWidth(1.0)
 
     def _draw_floor_grid(self, global_intensity):
@@ -691,8 +1137,8 @@ class SabaGL(QOpenGLWidget):
                 glVertex3f(t, grid_y, grid_extent * 0.5)
         glEnd()
 
-    def _draw_hud_overlay(self):
-        """Draw minimal modern HUD reticle."""
+    def _draw_hud_overlay(self, effects):
+        """Draw advanced JARVIS-style targeting reticle with animated brackets."""
         glDisable(GL_DEPTH_TEST)
 
         # Save matrices
@@ -705,31 +1151,201 @@ class SabaGL(QOpenGLWidget):
         glPushMatrix()
         glLoadIdentity()
 
-        # Minimal reticle
+        # Superior line rendering for crystal clear HUD
         glEnable(GL_LINE_SMOOTH)
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
-        glLineWidth(1.0)
+        glLineWidth(2.0)  # Thicker for better visibility
         
-        # Modern blue/cyan color
-        r, g, b = self.energy_color_base
-        glColor4f(r * 0.8, g * 0.8, b * 0.8, self.hud_alpha)
+        current_time = time.time()
         
-        # Simple crosshair - smaller and more subtle
-        tick_len = 0.015
-        gap = 0.008
+        # Enhanced dynamic HUD color with better saturation
+        hud_color = (0.0, 0.9, 1.0, 0.8)  # Bright cyan for JARVIS
+        glColor4f(*hud_color)
+        
+        # Enhanced central crosshair with gentle pulse
+        crosshair_pulse = 0.8 + 0.2 * math.sin(current_time * 1.5)  # Gentle heartbeat
+        crosshair_color = (0.0, 0.9 * crosshair_pulse, 1.0 * crosshair_pulse, 0.9)
+        glColor4f(*crosshair_color)
+        glLineWidth(2.2)
+        
+        # Main crosshair with breathing animation
+        tick_len = 0.035 + 0.008 * math.sin(current_time * 0.8)  # Subtle breathing
+        gap = 0.02
+        
         glBegin(GL_LINES)
-        # Right
+        # Horizontal crosshair
         glVertex2f(gap, 0.0)
         glVertex2f(gap + tick_len, 0.0)
-        # Left
         glVertex2f(-gap, 0.0)
         glVertex2f(-(gap + tick_len), 0.0)
-        # Up
+        # Vertical crosshair
         glVertex2f(0.0, gap)
         glVertex2f(0.0, gap + tick_len)
-        # Down
         glVertex2f(0.0, -gap)
         glVertex2f(0.0, -(gap + tick_len))
+        glEnd()
+        
+        # Processing indicator - central dot with intermittent glow
+        processing_cycle = (current_time * 2.0) % 3.0  # 3-second processing cycle
+        if processing_cycle < 2.0:  # Active processing
+            process_intensity = 0.5 + 0.5 * math.sin(processing_cycle * math.pi)
+            glColor4f(0.0, 1.0 * process_intensity, 1.0 * process_intensity, 0.8)
+            glPointSize(4.0 + 2.0 * process_intensity)
+            glBegin(GL_POINTS)
+            glVertex2f(0.0, 0.0)
+            glEnd()
+        
+        # Animated targeting brackets with snapping behavior
+        snap_cycle = (current_time * 0.4) % 5.0  # 5-second snap cycle
+        if snap_cycle < 0.3:  # Snapping in
+            snap_progress = snap_cycle / 0.3
+            snap_ease = 1.0 - (1.0 - snap_progress) ** 3  # Ease out cubic
+            base_distance = 0.25 - 0.10 * snap_ease
+            bracket_size = 0.04 + 0.04 * snap_ease
+        elif snap_cycle < 4.7:  # Steady state
+            base_distance = 0.15
+            bracket_size = 0.08
+        else:  # Relaxing back
+            relax_progress = (snap_cycle - 4.7) / 0.3
+            relax_ease = relax_progress ** 2  # Ease in
+            base_distance = 0.15 + 0.05 * relax_ease
+            bracket_size = 0.08 - 0.02 * relax_ease
+        
+        # Additional scanning animation
+        scan_wave = math.sin(current_time * 2.0)
+        scan_distance = base_distance + 0.015 * scan_wave
+        bracket_scan = scan_wave  # For compatibility
+        bracket_size = bracket_size + 0.01 * bracket_scan
+        bracket_size = 0.08 + 0.01 * bracket_scan
+        
+        # Cyan color for contrast with warm sphere - JARVIS targeting system
+        bracket_intensity = 0.7 + 0.3 * math.sin(current_time * 3.0)
+        bracket_color = (0.0, 0.9 * bracket_intensity, 1.0 * bracket_intensity, 0.8)
+        
+        # Lock-on glow effect (triggered periodically)
+        lock_on_cycle = (current_time * 0.3) % 4.0  # 4-second cycle
+        if lock_on_cycle < 0.2:  # Brief lock-on flash
+            lock_glow = math.sin(lock_on_cycle * math.pi / 0.2)
+            bracket_color = (
+                bracket_color[0] + 0.3 * lock_glow,
+                bracket_color[1] + 0.5 * lock_glow,
+                bracket_color[2] + 0.7 * lock_glow,
+                bracket_color[3] + 0.3 * lock_glow
+            )
+        
+        glColor4f(*bracket_color)
+        glLineWidth(2.8)  # Thicker for targeting system
+        
+        # Advanced corner brackets with scan lines
+        corners = [
+            (scan_distance, scan_distance),      # Top-right
+            (-scan_distance, scan_distance),     # Top-left
+            (-scan_distance, -scan_distance),    # Bottom-left
+            (scan_distance, -scan_distance)      # Bottom-right
+        ]
+        
+        # Main targeting brackets
+        glBegin(GL_LINES)
+        for cx, cy in corners:
+            # Horizontal bracket line (with scan effect)
+            x_dir = bracket_size * (1 if cx > 0 else -1)
+            glVertex2f(cx, cy)
+            glVertex2f(cx + x_dir, cy)
+            
+            # Vertical bracket line (with scan effect)
+            y_dir = bracket_size * (1 if cy > 0 else -1)
+            glVertex2f(cx, cy)
+            glVertex2f(cx, cy + y_dir)
+            
+            # Add scan line extensions during lock-on
+            if lock_on_cycle < 0.2:
+                scan_extension = 0.03 * lock_glow
+                # Extended horizontal line
+                glVertex2f(cx + x_dir, cy)
+                glVertex2f(cx + x_dir + (scan_extension * (1 if cx > 0 else -1)), cy)
+                # Extended vertical line
+                glVertex2f(cx, cy + y_dir)
+                glVertex2f(cx, cy + y_dir + (scan_extension * (1 if cy > 0 else -1)))
+        glEnd()
+        
+        # Inner precision brackets with independent animation
+        inner_scan = math.sin(current_time * 2.5 + math.pi/4)  # Phase offset
+        inner_distance = scan_distance * 0.6 + 0.015 * inner_scan
+        inner_bracket_size = bracket_size * 0.4
+        
+        glColor4f(1.0, 1.0, 1.0, 0.6)  # Bright white inner brackets
+        glLineWidth(1.8)
+        
+        glBegin(GL_LINES)
+        for cx, cy in corners:
+            # Scale to inner position
+            inner_cx = cx * 0.6
+            inner_cy = cy * 0.6
+            
+            # Inner bracket with scan movement
+            x_dir = inner_bracket_size * (1 if cx > 0 else -1)
+            y_dir = inner_bracket_size * (1 if cy > 0 else -1)
+            
+            glVertex2f(inner_cx, inner_cy)
+            glVertex2f(inner_cx + x_dir, inner_cy)
+            glVertex2f(inner_cx, inner_cy)
+            glVertex2f(inner_cx, inner_cy + y_dir)
+        glEnd()
+        
+        # Target acquisition scanner lines
+        if lock_on_cycle < 0.5:  # Scanner active during first half of cycle
+            scanner_alpha = 0.4 * (1.0 - lock_on_cycle / 0.5)  # Fade out
+            glColor4f(0.2, 1.0, 1.0, scanner_alpha)
+            glLineWidth(1.0)
+            
+            # Horizontal scanner
+            scanner_y = math.sin(current_time * 8.0) * 0.12
+            glBegin(GL_LINES)
+            glVertex2f(-0.2, scanner_y)
+            glVertex2f(0.2, scanner_y)
+            glEnd()
+            
+            # Vertical scanner
+            scanner_x = math.cos(current_time * 6.0) * 0.12
+            glBegin(GL_LINES)
+            glVertex2f(scanner_x, -0.2)
+            glVertex2f(scanner_x, 0.2)
+            glEnd()
+        
+        # Central targeting circle with scan lines
+        glLineWidth(1.2)
+        center_color = (0.0, 0.7, 1.0, 0.3)
+        glColor4f(*center_color)
+        
+        # Rotating scan line effect
+        scan_rotation = current_time * 2.0
+        glBegin(GL_LINE_LOOP)
+        inner_radius = 0.06
+        segments = 24
+        for i in range(segments):
+            angle = 2.0 * math.pi * i / segments
+            
+            # Add scan line intensity variation
+            scan_intensity = 1.0 + 0.5 * math.sin(angle + scan_rotation)
+            local_radius = inner_radius * scan_intensity
+            
+            x = local_radius * math.cos(angle)
+            y = local_radius * math.sin(angle)
+            glVertex2f(x, y)
+        glEnd()
+        
+        # Energy flow indicators (small moving dots)
+        glPointSize(3.0)
+        dot_color = (0.2, 1.0, 1.0, 0.8)
+        glColor4f(*dot_color)
+        
+        glBegin(GL_POINTS)
+        for i in range(4):
+            angle = (current_time * 1.5 + i * math.pi / 2) % (2 * math.pi)
+            flow_radius = 0.25
+            x = math.cos(angle) * flow_radius
+            y = math.sin(angle) * flow_radius
+            glVertex2f(x, y)
         glEnd()
 
         # Restore matrices
@@ -810,8 +1426,8 @@ class SabaGL(QOpenGLWidget):
 
         glEnable(GL_DEPTH_TEST)
 
-    def _draw_vignette_overlay(self):
-        """Soft radial darkening towards edges for cinematic look."""
+    def _draw_vignette_overlay(self, effects):
+        """JARVIS-style radial vignette with subtle orange/red glow."""
         glDisable(GL_DEPTH_TEST)
 
         # Save matrices
@@ -824,17 +1440,27 @@ class SabaGL(QOpenGLWidget):
         glPushMatrix()
         glLoadIdentity()
 
+        # Enhanced vignette intensity for cinematic effect
+        vignette_alpha = effects.get('vignette_alpha', 0.35)
+        
+        # Subtle red/orange vignette for JARVIS aesthetic
         glBegin(GL_TRIANGLE_FAN)
         # Center transparent
         glColor4f(0.0, 0.0, 0.0, 0.0)
         glVertex2f(0.0, 0.0)
-        # Edge dark
-        steps = 64
+        # Edge with warm cinematic darkness
+        steps = 80  # More steps for smoother gradient
         for i in range(steps + 1):
             angle = 2.0 * math.pi * (i / float(steps))
-            x = math.cos(angle)
-            y = math.sin(angle)
-            glColor4f(0.0, 0.0, 0.0, self.vignette_alpha)
+            x = math.cos(angle) * 1.3
+            y = math.sin(angle) * 1.3
+            
+            # Subtle warm edge tint (very dark red/orange)
+            edge_r = 0.08 * vignette_alpha  # Very subtle red
+            edge_g = 0.02 * vignette_alpha  # Minimal green
+            edge_b = 0.0                    # No blue for warmth
+            
+            glColor4f(edge_r, edge_g, edge_b, vignette_alpha * 0.8)
             glVertex2f(x, y)
         glEnd()
 
@@ -846,10 +1472,173 @@ class SabaGL(QOpenGLWidget):
 
         glEnable(GL_DEPTH_TEST)
 
+    def _draw_scanline_overlay(self, effects):
+        """Add subtle holographic scan lines across the entire screen."""
+        glDisable(GL_DEPTH_TEST)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        # Save matrices
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        glOrtho(-1, 1, -1, 1, -1, 1)
+
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+
+        current_time = time.time()
+        
+        # Subtle horizontal scan lines
+        scan_alpha = 0.03 + 0.01 * math.sin(current_time * 1.2)
+        scan_color = (0.0, 0.4, 0.8, scan_alpha)  # Subtle cyan
+        
+        glColor4f(*scan_color)
+        glLineWidth(0.5)
+        
+        # Draw horizontal scan lines
+        line_spacing = 0.08  # Spacing between lines
+        scan_offset = (current_time * 0.1) % line_spacing  # Slow moving scan
+        
+        y = -1.0 - scan_offset
+        while y < 1.0:
+            # Varying intensity for some lines
+            line_intensity = scan_alpha * (0.8 + 0.4 * math.sin(y * 20.0 + current_time))
+            if line_intensity > 0.01:
+                glColor4f(scan_color[0], scan_color[1], scan_color[2], line_intensity)
+                glBegin(GL_LINES)
+                glVertex2f(-1.0, y)
+                glVertex2f(1.0, y)
+                glEnd()
+            y += line_spacing
+        
+        # Occasional bright scan sweep
+        sweep_cycle = (current_time * 0.2) % 6.0  # 6-second cycle
+        if sweep_cycle < 0.3:  # Brief sweep
+            sweep_progress = sweep_cycle / 0.3
+            sweep_y = -1.0 + sweep_progress * 2.0
+            sweep_alpha = 0.15 * math.sin(sweep_progress * math.pi)
+            
+            sweep_color = (0.2, 0.8, 1.0, sweep_alpha)
+            glColor4f(*sweep_color)
+            glLineWidth(2.0)
+            
+            glBegin(GL_LINES)
+            glVertex2f(-1.0, sweep_y)
+            glVertex2f(1.0, sweep_y)
+            glEnd()
+            
+            # Sweep glow effect
+            for offset in [-0.02, 0.02]:
+                glow_alpha = sweep_alpha * 0.3
+                glColor4f(sweep_color[0], sweep_color[1], sweep_color[2], glow_alpha)
+                glLineWidth(1.0)
+                
+                glBegin(GL_LINES)
+                glVertex2f(-1.0, sweep_y + offset)
+                glVertex2f(1.0, sweep_y + offset)
+                glEnd()
+
+        # Restore matrices
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+
+        glEnable(GL_DEPTH_TEST)
+
+    def _draw_background_grid(self, effects):
+        """Draw subtle background grid pattern for three-dimensional space feel."""
+        glDisable(GL_DEPTH_TEST)
+        
+        # Save matrices for background rendering
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        
+        # Use perspective for 3D grid effect
+        aspect = self.width() / self.height() if self.height() > 0 else 1.0
+        gluPerspective(45, aspect, 0.1, 100.0)
+        
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        
+        # Position camera for background grid view
+        gluLookAt(0, 0, 5, 0, 0, 0, 0, 1, 0)
+        
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_LINE_SMOOTH)
+        glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
+        glLineWidth(0.5)
+        
+        current_time = time.time()
+        
+        # Very subtle grid that slowly moves
+        grid_scroll = (current_time * 0.1) % 2.0  # Slow scroll
+        grid_alpha = 0.08  # Very subtle
+        grid_color = (0.2, 0.4, 0.6, grid_alpha)  # Cool blue-gray
+        
+        glColor4f(*grid_color)
+        
+        # Draw far background grid
+        glTranslatef(0, 0, -15)  # Push way back
+        
+        grid_size = 20
+        grid_spacing = 1.0
+        
+        glBegin(GL_LINES)
+        # Vertical lines
+        for i in range(-grid_size, grid_size + 1):
+            x = i * grid_spacing + (grid_scroll - 1.0) * grid_spacing
+            glVertex3f(x, -grid_size * grid_spacing, 0)
+            glVertex3f(x, grid_size * grid_spacing, 0)
+        
+        # Horizontal lines
+        for i in range(-grid_size, grid_size + 1):
+            y = i * grid_spacing + (grid_scroll - 1.0) * grid_spacing
+            glVertex3f(-grid_size * grid_spacing, y, 0)
+            glVertex3f(grid_size * grid_spacing, y, 0)
+        glEnd()
+        
+        # Add some subtle dots at grid intersections with fading
+        glPointSize(1.0)
+        dot_color = (0.3, 0.6, 0.8, grid_alpha * 0.8)
+        glColor4f(*dot_color)
+        
+        glBegin(GL_POINTS)
+        for i in range(-grid_size//2, grid_size//2 + 1, 2):
+            for j in range(-grid_size//2, grid_size//2 + 1, 2):
+                x = i * grid_spacing + (grid_scroll - 1.0) * grid_spacing
+                y = j * grid_spacing + (grid_scroll - 1.0) * grid_spacing
+                
+                # Distance-based fading
+                distance = math.sqrt(x*x + y*y)
+                fade = max(0.0, 1.0 - distance / (grid_size * grid_spacing * 0.8))
+                if fade > 0.1:
+                    glColor4f(dot_color[0], dot_color[1], dot_color[2], dot_color[3] * fade)
+                    glVertex3f(x, y, 0)
+        glEnd()
+        
+        # Restore matrices
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW)
+        
+        glEnable(GL_DEPTH_TEST)
+
     def _draw_dashboard(self, rms: float, spec: np.ndarray | None):
-        """Minimal modern dashboard overlay."""
+        """Minimal modern dashboard overlay with crystal clear text."""
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        # Superior text rendering quality
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.TextAntialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing, True)
+        painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform, True)
 
         w = self.width()
         h = self.height()
@@ -872,10 +1661,23 @@ class SabaGL(QOpenGLWidget):
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.drawRoundedRect(info_rect.adjusted(1, 1, -1, -1), 7, 7)
 
-        # Minimal text info
-        info_font = QtGui.QFont("Segoe UI", 9)
+        # Crystal clear text rendering with enhanced typography
+        info_font = typography.get_font('body', 9)
+        info_font.setWeight(QtGui.QFont.Normal)
+        info_font.setHintingPreference(QtGui.QFont.PreferFullHinting)  # Superior text clarity
+        info_font.setStyleStrategy(QtGui.QFont.PreferAntialias)
         painter.setFont(info_font)
-        painter.setPen(QtGui.QColor.fromRgbF(0.8, 0.9, 1.0, 0.8))
+        
+        # Enhanced text color with better visibility
+        text_color = color_scheme.get_color('text_primary', 0.9)
+        # Boost text contrast for crystal clarity
+        enhanced_color = QtGui.QColor.fromRgbF(
+            min(1.0, text_color[0] * 1.1),
+            min(1.0, text_color[1] * 1.1),
+            min(1.0, text_color[2] * 1.1),
+            text_color[3]
+        )
+        painter.setPen(enhanced_color)
         
         # FPS
         fps_text = f"FPS: {self._fps:0.0f}"
