@@ -122,3 +122,4 @@ win32_setctime==1.2.0
 wrapt==1.17.3
 zstandard==0.23.0
 openai-whisper==20231117
+sounddevice==0.5.1

@@ -32,9 +32,10 @@ class AsyncLLMService:
     def __init__(self, system_prompt: Optional[str] = None, config: Optional[LLMConfig] = None) -> None:
         self.config = config or LLMConfig()
         self.system_prompt = system_prompt or (
-            "You are Saba, a Jarvis-like AI assistant. Be direct, proactive, and action-focused. "
-            "Reply in 1–2 short sentences; ask only essential questions. "
-            "Briefly flag any risks or required permissions and suggest the next safe step."
+            "You are Saba, a Jarvis-like AI assistant. Be direct, proactive, and conversational. "
+            "Reply in 1–2 short sentences with natural, friendly responses. "
+            "Do not include risk assessments, next steps, or internal analysis in your responses. "
+            "Just provide helpful, conversational replies."
         )
 
         self._llm = self._init_llm()

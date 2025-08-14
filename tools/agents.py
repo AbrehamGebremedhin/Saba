@@ -61,8 +61,9 @@ class AsyncAgentExecutor:
             - Keep replies to 1–2 short sentences.
             - Ask only essential clarifying questions when strictly needed.
             - Prefer using tools to fetch facts; avoid guessing.
-            - Keep your chain-of-thought private. Do not reveal internal thoughts in the final answer.
-            - If action is blocked or risky, briefly flag it and suggest the next safe step.
+            - Your internal reasoning (Thought, Action, Observation) must NEVER appear in the Final Answer.
+            - The Final Answer should ONLY contain your direct response to the user.
+            - Do NOT include risk assessments, next steps, or any internal analysis in the Final Answer.
 
             You can use these tools:
             {tools}
@@ -75,9 +76,10 @@ class AsyncAgentExecutor:
             Observation: <tool result>
             Thought: <decide next step or finalize>
             ... (repeat Action/Action Input/Observation as needed) ...
-            Final Answer: <concise answer only>
+            Final Answer: <ONLY your direct, conversational response to the user - no internal reasoning>
 
             Begin:
+            Question: {input}
             Thought: {agent_scratchpad}
         """
         from langchain_core.prompts import PromptTemplate
@@ -102,6 +104,26 @@ class AsyncAgentExecutor:
         result = await self.agent_executor.ainvoke({"input": input_text})
         # If result is a dict with 'output', check if it's a movie info dict
         output = result['output'] if isinstance(result, dict) and 'output' in result else result
+        
+        # Clean up the output by removing internal reasoning artifacts
+        if isinstance(output, str):
+            # Remove risk assessments and next steps that should be internal
+            lines = output.split('\n')
+            cleaned_lines = []
+            for line in lines:
+                line = line.strip()
+                # Skip lines that contain internal reasoning artifacts
+                if (line.startswith('**Risk:**') or 
+                    line.startswith('**Next Step:**') or
+                    line.startswith('Risk:') or
+                    line.startswith('Next Step:') or
+                    'Risk:' in line and ('None detected' in line or 'Low' in line or 'Medium' in line or 'High' in line) or
+                    'Next Step:' in line and ('Please' in line or 'Suggest' in line)):
+                    continue
+                if line:  # Only add non-empty lines
+                    cleaned_lines.append(line)
+            output = ' '.join(cleaned_lines).strip()
+        
         # Try to detect a movie info dict and format a final answer
         if isinstance(output, dict) and all(k in output for k in ("Title", "Plot", "Year")):
             # Format a nice summary

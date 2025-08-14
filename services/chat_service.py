@@ -55,9 +55,43 @@ class ChatService:
         
         # Add response to conversation history
         if response:
+            # Clean the response before adding to history and returning
+            response = self._clean_response(response)
             self.conversation_history.append({"role": "assistant", "content": response})
             
         return response
+        
+    def _clean_response(self, response: str) -> str:
+        """
+        Clean the response by removing internal reasoning artifacts.
+        
+        Args:
+            response (str): The raw response from the LLM
+            
+        Returns:
+            str: The cleaned response
+        """
+        if not response:
+            return response
+            
+        # Split into lines and filter out internal reasoning
+        lines = response.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            # Skip lines that contain internal reasoning artifacts
+            if (line.startswith('**Risk:**') or 
+                line.startswith('**Next Step:**') or
+                line.startswith('Risk:') or
+                line.startswith('Next Step:') or
+                'Risk:' in line and ('None detected' in line or 'Low' in line or 'Medium' in line or 'High' in line) or
+                'Next Step:' in line and ('Please' in line or 'Suggest' in line or 'provide' in line.lower())):
+                continue
+            if line:  # Only add non-empty lines
+                cleaned_lines.append(line)
+        
+        return ' '.join(cleaned_lines).strip()
         
     async def _generate_response(self, user_text: str) -> str:
         """
@@ -75,7 +109,8 @@ class ChatService:
         # Simple command processing - you can expand this
         if "hello" in user_text_lower or "hi" in user_text_lower:
             # Await the coroutine so we return a string, not a coroutine object
-            return await self.llm_service.acomplete(user_text)
+            response = await self.llm_service.acomplete(user_text)
+            return self._clean_response(response)
             
         elif "time" in user_text_lower:
             import datetime
@@ -83,10 +118,12 @@ class ChatService:
             return f"The current time is {current_time}"
             
         elif "goodbye" in user_text_lower or "bye" in user_text_lower:
-            sys.exit(await self.llm_service.acomplete(user_text))
+            response = await self.llm_service.acomplete(user_text)
+            sys.exit(self._clean_response(response))
         else:
             # Default response for unrecognized input
-            return await self.agent_executor.ainvoke(user_text)
+            agent_response = await self.agent_executor.ainvoke(user_text)
+            return self._clean_response(agent_response)
 
     async def synthesize_response(self, response_text: str, output_file: str = "output.wav"):
         """
